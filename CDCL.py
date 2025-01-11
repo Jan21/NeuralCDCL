@@ -207,7 +207,7 @@ for clauses in formulas:
 
 
     solver = CDCLSolver(clauses)
-    is_satisfiable,trace = solver.solve()
+    is_satisfiable = solver.solve()
     assert is_sat_pysat == is_satisfiable
 
     if is_satisfiable:
