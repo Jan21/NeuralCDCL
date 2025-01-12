@@ -10,85 +10,114 @@ class CDCLSolver:
         self.implication_graph = {}
         self.reason_clauses = {}
         self.learned_clauses = []
+        self.trace = []
         
     def solve(self):
+        self.trace.append(f"num vars: {self.count_variables()}")
         while True:
+            self.trace.append(f"current level: {self.level}")
+            self.trace.append(f'current assignment: {self.assignments}') #TODO
             conflict = self.unit_propagate()
             if conflict:
                 if self.level == 0:
+                    self.trace.append("UNSAT")
                     return False
                 learned_clause = self.analyze_conflict(conflict)
                 backtrack_level = self.find_backtrack_level(learned_clause)
                 self.backtrack(backtrack_level)
                 self.learned_clauses.append(learned_clause)
             else:
+                self.trace.append(f'assignment length: {len(self.assignments)}')
+                
                 if len(self.assignments) == self.count_variables():
+                    self.trace.append("SAT")
                     return True
                 var = self.pick_branching_variable()
                 if var is None:
                     return True
                 self.level += 1
                 self.assign(var, True, None)
+                self.trace.append(f'variable assigned: x{var} = {True} at level {self.level} by branching')
 
-    def unit_propagate(self):
+    def unit_propagate(self,):
+        self.trace.append("UP begin")
         while True:
+            self.trace.append('UP iteration')
             propagated = False
             for clause in self.clauses + self.learned_clauses:
                 status, value = self.evaluate_clause(clause)
                 if status and not value:
+                    self.trace.append(f"found conflict: {clause}") #TODO
                     return clause
                 elif self.is_unit(clause):
+                    self.trace.append(f'unit found: {clause}') # TODO convert clause
                     lit = self.get_unassigned_literal(clause)
                     var = abs(lit)
                     value = lit > 0
+                    self.trace.append(f'variable assigned: x{var} = {value} at level {self.level} because of reason {clause}') #TODO
                     self.assign(var, value, clause)
                     propagated = True
             if not propagated:
+                self.trace.append("nothing propagated")
                 break
         return None
 
 
 
     def analyze_conflict(self, conflict_clause):
+        self.trace.append("AC begin")
         # Initialize sets to track variables at current decision level and literals for learned clause
         current_level_vars = set()  # Variables assigned at current decision level
         learned_lits = set()        # Literals that will form the learned clause
 
         # Start with literals from the conflict clause
         queue = self.get_literals_from_clause(conflict_clause) #
-
+        self.trace.append(f"queue: {queue}") #TODO
         while True:
             # Process each literal in the current clause
             for lit in queue:
                 var = abs(lit)  # Get variable (removing sign)
+                self.trace.append(f"checking variable: x{var} assigned at level {self.decision_level.get(var)}")
                 
                 # If variable was assigned at current level, add to current_level_vars
                 if self.decision_level.get(var) == self.level:
                     current_level_vars.add(var)
+                    self.trace.append(f"current level vars: {current_level_vars}") #TODO
                 # If assigned at earlier level, add to learned clause
                 else:
                     learned_lits.add(-var if self.assignments[var] else var)
+                    var_str = "x"+str(var)
+                    self.trace.append(f"learned lits: {"-" + var_str if self.assignments[var] else var_str}") #TODO
             
             # UIP condition: only one variable from current decision level remains
             if len(current_level_vars) <= 1:
+                self.trace.append("UIP")
                 break
+ 
                 
             # Get most recently assigned variable from current level
             var = self.get_latest_assigned(current_level_vars)
+            self.trace.append(f"latest assigned: x{var}")
             current_level_vars.remove(var)
             
             # Get the clause that caused this variable's assignment
             reason = self.reason_clauses.get(var)
+            self.trace.append(f"reason for x{var} is {reason}") #TODO
             if reason:
                 queue = [lit for lit in self.get_literals_from_clause(reason) 
                         if abs(lit) != var]
+                self.trace.append(f"queue: {queue}") # TODO
         
         # Create set of literals from current level variables with opposite polarity
         current_level_lits = {-var if self.assignments[var] else var for var in current_level_vars}
+        self.trace.append(f"current level lits: {current_level_lits}")
         new_clause =list(learned_lits.union(current_level_lits)) # TODO check if this is correct'
+        self.trace.append(f"new clause: {new_clause}")
+        self.trace.append("AC end")
         return new_clause
 
     def backtrack(self, level):
+        self.trace.append("BT begin")
         self.level = level
         self.assignments = {var: value for var, value in self.assignments.items() 
                           if self.decision_level[var] <= level}
@@ -140,12 +169,17 @@ class CDCLSolver:
         return max(vars_set, key=lambda var: list(self.assignments.keys()).index(var))
 
     def find_backtrack_level(self, learned_clause):
+        self.trace.append(f"FB begin")
         levels = [self.decision_level[abs(lit)] for lit in learned_clause 
                  if abs(lit) in self.decision_level]
+        self.trace.append(f"levels: {levels}")
         if not levels:
+            self.trace.append("GOTO level: 0")
             return 0
         levels.sort(reverse=True)
-        return levels[1] if len(levels) > 1 else 0
+        goto = levels[1] if len(levels) > 1 else 0
+        self.trace.append("GOTO level: {goto}")
+        return goto
 
     def pick_branching_variable(self):
         for var in range(1, self.count_variables() + 1):
@@ -195,9 +229,11 @@ def generate_random_formula(n_vars, n_clauses=None, clause_length=3):
 
  ######## TEST
 formulas = []
-for i in range(50):
-    formulas.append(generate_random_formula(50))
+for i in range(1):
+    formulas.append(generate_random_formula(10))
 
+
+traces =  []
 for clauses in formulas:
     g = Glucose3()
     for clause in clauses:
@@ -207,7 +243,8 @@ for clauses in formulas:
 
 
     solver = CDCLSolver(clauses)
-    is_satisfiable,trace = solver.solve()
+    is_satisfiable = solver.solve()
+    traces.append(solver.trace)
     assert is_sat_pysat == is_satisfiable
 
     if is_satisfiable:
@@ -222,3 +259,4 @@ for clauses in formulas:
     # Check if solution satisfies formula
         is_valid = g_verify.solve(assumptions=assumptions)
         assert is_valid
+print(traces)
