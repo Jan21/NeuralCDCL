@@ -178,7 +178,7 @@ class CDCLSolver:
             return 0
         levels.sort(reverse=True)
         goto = levels[1] if len(levels) > 1 else 0
-        self.trace.append("GOTO level: {goto}")
+        self.trace.append(f"GOTO level: {goto}")
         return goto
 
     def pick_branching_variable(self):
