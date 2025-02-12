@@ -18,6 +18,7 @@ from litgpt.api import Preprocessor
 
 import json
 import os
+import wandb
 
 
 class LitLLM(L.LightningModule):
@@ -66,10 +67,10 @@ class LitLLM(L.LightningModule):
         logits, loss = self(idx, targets)
         # accuracy = self.calculate_accuracy(logits, targets)
         self.log(
-            f"val_loss_{self.val_dataset_names[dataloader_idx]}", loss, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True
+            f"loss_{self.val_dataset_names[dataloader_idx]}", loss, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True
         )
         # self.log('val_accuracy', accuracy, on_step=True, on_epoch=True, prog_bar=True)
-        return {f"val_loss_{self.val_dataset_names[dataloader_idx]}": loss}
+        return {f"loss_{self.val_dataset_names[dataloader_idx]}": loss}
 
     def configure_optimizers(self):
         betas = self.cfg.optimizer.betas
@@ -176,7 +177,7 @@ def main(cfg: DictConfig):
 
     trainer = L.Trainer(
         accelerator="cuda",
-        devices="1, 2",
+        devices=[2],
         max_epochs=cfg.model.epochs,
         accumulate_grad_batches=accumulate_grad_batches,
         precision="bf16-true",

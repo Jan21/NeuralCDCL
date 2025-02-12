@@ -2,6 +2,7 @@ import torch
 from lightning.pytorch.callbacks import Callback
 import wandb
 import random
+from lightning.pytorch.loggers import WandbLogger
 
 class TrainingCallback(Callback):
     def __init__(self, epoch_frequency, tokenizer, max_length, acc_sample_size, val_dataset_names):
@@ -60,12 +61,10 @@ class TrainingCallback(Callback):
 
     def on_train_epoch_end(self, trainer, model):
         """Log accuracy and example text for each validation dataset at the specified frequency."""
-        if trainer.current_epoch % self.epoch_frequency == 0 and trainer.current_epoch > 0:
+        if trainer.current_epoch % self.epoch_frequency == 0:
             val_dataloaders = trainer.val_dataloaders
             for dataloader_idx, val_dataloader in enumerate(val_dataloaders):
                 dataset = val_dataloader.dataset
-
-                # Sample 100 random entries from the dataset
                 sample_size = min(self.acc_sample_size, len(dataset))
                 sampled_indices = random.sample(range(len(dataset)), sample_size)
                 sampled_data = [dataset[i] for i in sampled_indices]
@@ -76,10 +75,12 @@ class TrainingCallback(Callback):
                 example_text = self.generate_example_text(model, tokenized_input)
 
                 dataset_name = self.val_dataset_names[dataloader_idx]
-                wandb.log({
-                    f"{dataset_name}/accuracy": acc,
-                    f"{dataset_name}/text": wandb.Html(f"<p>{example_text}</p>")
-                })
+                if trainer.logger is not None and isinstance(trainer.logger, WandbLogger):
+                    wandb_logger = trainer.logger
+                    wandb_logger.experiment.log({
+                        f"{dataset_name}/accuracy": acc,
+                        f"{dataset_name}/text": wandb.Html(f"<p>{example_text}</p>")
+                    })
                 print(
                     f"[Epoch {trainer.current_epoch}] "
                     f"Dataset: {dataset_name}; "
