@@ -1,0 +1,31 @@
+data:
+  datapath_train: ${hydra:runtime.cwd}/temp/train_formulas.pkl
+  datapath_val: ${hydra:runtime.cwd}/temp/val_formulas.pkl
+  tokenizer_path: ${hydra:runtime.cwd}/tokenizer/tokenizer.json
+  num_workers: 4
+
+model:
+  model_name: "GPT2"
+  n_layer: 12
+  n_head: 1
+  n_embd: 256
+  dropout: 0.1
+  n_hidden: 256
+  block_size: 1024
+  vocab_size: 300
+  num_classes: 2
+  bias: True
+  num_vars: 20
+
+train:
+  batchsize: 32
+  val_batchsize: 1
+  max_epochs: 1000
+  grad_clip: 1.0
+  weight_decay: 0.1
+  learning_rate: 3e-4
+  patience: 10
+  betas: [0.9, 0.95]
+
+other:
+  ckpt: "ckpt.pt"
