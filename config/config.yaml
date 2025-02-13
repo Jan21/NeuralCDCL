@@ -10,7 +10,8 @@ hydra:
 
 general:
   project: "SAT"
-  run_name: "Pythia-6-4-128-dfs (Training on hard)"
+  run_name: "Pythia-6-4-128-dfs (Training on easy)"
+  devices: [1]
 
 tok_data:
   train_file: "../data/cdcl_easy.json"
@@ -24,17 +25,17 @@ data:
   val_file_medium: "cdcl_medium_val.json"
   train_file_hard: "cdcl_hard_train.json"
   val_file_hard: "cdcl_hard_val.json"
-  train_data: "hard"
+  train_data: "easy"
   num_train: 100000
-  num_eval: 100
+  num_eval: 1000
   num_workers: 64
 
 model:
   name: "Pythia-${model.n_layer}-${model.n_head}-${model.n_embd}-dfs"
-  batch_size: 12
+  batch_size: 32
   accumulate_grad_batches: 1
   block_size: 4096
-  epochs: 50
+  epochs: 10
   n_layer: 6
   n_head: 4
   n_embd: 128
@@ -46,9 +47,9 @@ model:
   tokenizer_path: "model/${dl_model.full_path}"
 
 optimizer:
-  warmup_steps: 10
-  lr: 2e-4
-  weight_decay: 0.0
+  warmup_steps: 4000
+  lr: 5e-4
+  weight_decay: 0.01
   betas: [0.9, 0.95]
 
 eval:
@@ -57,8 +58,10 @@ eval:
   batch_size: 64
   eval_interval: 10
   results_dir: "data/eval_results/${model.name}"
+  log_step_frequency: 200
+  val_check_interval: 0.5
   callback_epoch_frequency: 1
-  callback_acc_data_count: 25
+  callback_acc_data_count: 20
 
 dl_model:
   model_folder: "checkpoints"

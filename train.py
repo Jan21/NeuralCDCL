@@ -64,13 +64,9 @@ class LitLLM(L.LightningModule):
             batch["labels"],
             batch["attention_mask"],
         )
-        logits, loss = self(idx, targets)
-        # accuracy = self.calculate_accuracy(logits, targets)
-        self.log(
-            f"loss_{self.val_dataset_names[dataloader_idx]}", loss, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True
-        )
-        # self.log('val_accuracy', accuracy, on_step=True, on_epoch=True, prog_bar=True)
-        return {f"loss_{self.val_dataset_names[dataloader_idx]}": loss}
+        _, loss = self(idx, targets)
+        self.log(f"loss_{self.val_dataset_names[dataloader_idx]}", loss, on_epoch=True, sync_dist=True, prog_bar=True)
+        return {f"loss_{self.val_dataset_names[dataloader_idx]}": loss, "dataset": self.val_dataset_names[dataloader_idx]}
 
     def configure_optimizers(self):
         betas = self.cfg.optimizer.betas
@@ -81,9 +77,9 @@ class LitLLM(L.LightningModule):
             betas=(betas[0], betas[1])
         )
         scheduler = torch.optim.lr_scheduler.LambdaLR(
-            optimizer, lambda step: step / self.cfg.optimizer.warmup_steps
+            optimizer, lambda step: min((step + 1) / self.cfg.optimizer.warmup_steps, 1.0)
         )
-        return [optimizer], [scheduler]
+        return [optimizer], [{"scheduler": scheduler, "interval": "step"}]
 
     def forward(
         self, idx: torch.Tensor, targets: Optional[torch.Tensor] = None
@@ -95,7 +91,6 @@ class LitLLM(L.LightningModule):
         input_ids: torch.Tensor,
         max_length: int,
         temperature: float = 1.0,
-        eos_token_id: Optional[int] = None,
     ) -> torch.Tensor:
         """
         Generate text using the model.
@@ -104,32 +99,21 @@ class LitLLM(L.LightningModule):
             input_ids (torch.Tensor): Input token IDs of shape (batch_size, seq_len).
             max_length (int): Maximum length of the generated sequence.
             temperature (float): Sampling temperature. Lower values make the model more deterministic.
-            eos_token_id (int): Token ID for the end-of-sequence token. Generation stops when this token is generated.
 
         Returns:
             torch.Tensor: Generated token IDs of shape (batch_size, generated_seq_len).
         """
-        self.eval()  # Set the model to evaluation mode
+        self.eval()
         generated = input_ids
 
         for _ in range(max_length - input_ids.size(1)):
-            # Get the logits for the next token
             with torch.no_grad():
                 logits = self(generated)[:, -1, :]  # (batch_size, vocab_size)
 
-            # Apply temperature
             logits = logits / temperature
-
-            # Sample the next token
             probs = torch.softmax(logits, dim=-1)
             next_token = torch.multinomial(probs, num_samples=1)  # (batch_size, 1)
-
-            # Append the generated token to the sequence
             generated = torch.cat([generated, next_token], dim=-1)
-
-            # Stop if EOS token is generated
-            if eos_token_id is not None and (next_token == eos_token_id).all():
-                break
 
         return generated
 
@@ -177,11 +161,11 @@ def main(cfg: DictConfig):
 
     trainer = L.Trainer(
         accelerator="cuda",
-        devices=[2],
+        devices=cfg.general.devices,
         max_epochs=cfg.model.epochs,
         accumulate_grad_batches=accumulate_grad_batches,
         precision="bf16-true",
-        val_check_interval=1.0,
+        val_check_interval=cfg.eval.val_check_interval,
         callbacks=[TrainingCallback(
             epoch_frequency=cfg.eval.callback_epoch_frequency,
             tokenizer=tokenizer,
@@ -190,6 +174,7 @@ def main(cfg: DictConfig):
             val_dataset_names=['val_easy', 'val_medium', 'val_hard'])
         ],
         logger=logger,
+        log_every_n_steps=cfg.eval.log_step_frequency
     )
     trainer.fit(lit_model, data)
 
