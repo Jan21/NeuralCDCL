@@ -13,7 +13,7 @@ from callbacks.save_callback import SaveBeforeEvalCallback
 from training_callback import TrainingCallback
 from config import hf_config
 from litgpt.config import configs, Config, name_to_config
-from litgpt.model import GPT
+from litgpt.model import GPT, Llama
 from litgpt.api import Preprocessor
 
 import json
@@ -22,7 +22,7 @@ import wandb
 
 
 class LitLLM(L.LightningModule):
-    def __init__(self, cfg, model, preprocessor, val_dataset_names, trainer_ckpt_path=None):
+    def __init__(self, cfg, model, preprocessor, val_dataset_names, delimiter_token_id, trainer_ckpt_path=None):
         super().__init__()
 
         # self.llm = LLM.load(
@@ -39,6 +39,7 @@ class LitLLM(L.LightningModule):
         self.preprocessor = preprocessor
         self.val_dataset_names = val_dataset_names
         self.trainer_ckpt_path = trainer_ckpt_path
+        self.delimiter_token_id = delimiter_token_id
         _, self.hf_conf = hf_config.get_configs(cfg)
 
     def setup(self, stage):
@@ -46,12 +47,20 @@ class LitLLM(L.LightningModule):
         with open(os.path.join(self.cfg.convert_hf.in_path, "config.json"), "w") as f:
             json.dump(self.hf_conf, f, indent=2)
 
+    def mask_targets(self, input_ids, target_ids):
+        # Create a mask for all positions up to and including the first occurrence of search_token_id
+        first_search_pos = (input_ids == self.delimiter_token_id).cumsum(dim=1).bool()
+        mask = ~first_search_pos.cumsum(dim=1).bool()
+        # Apply the mask to targets, setting masked positions to -100
+        return torch.where(mask, torch.tensor(-100, device=target_ids.device), target_ids)
+
     def training_step(self, batch: torch.Tensor, batch_idx: int) -> torch.Tensor:
         idx, targets, att_mask = (
             batch["input_ids"],
             batch["labels"],
             batch["attention_mask"],
         )
+        targets = self.mask_targets(idx, targets)
         _, loss = self(idx, targets)
         self.log("train_loss", loss, sync_dist=True)
         current_lr = self.trainer.optimizers[0].param_groups[0]['lr']
@@ -64,6 +73,7 @@ class LitLLM(L.LightningModule):
             batch["labels"],
             batch["attention_mask"],
         )
+        targets = self.mask_targets(idx, targets)
         _, loss = self(idx, targets)
         self.log(f"loss_{self.val_dataset_names[dataloader_idx]}", loss, on_epoch=True, sync_dist=True, prog_bar=True)
         return {f"loss_{self.val_dataset_names[dataloader_idx]}": loss, "dataset": self.val_dataset_names[dataloader_idx]}
@@ -76,8 +86,18 @@ class LitLLM(L.LightningModule):
             weight_decay=self.cfg.optimizer.weight_decay, 
             betas=(betas[0], betas[1])
         )
+        # Linear scheduler: warm-up + decay
+        def lr_lambda(step):
+            if step < self.cfg.optimizer.warmup_steps:
+                return (step + 1) / self.cfg.optimizer.warmup_steps  # Warm-up phase
+            else:
+                # After warm-up, we apply linear decay
+                total_steps = (self.cfg.data.num_train / self.cfg.eval.batch_size) * self.cfg.model.epochs
+                decay_steps = step - self.cfg.optimizer.warmup_steps
+                return max(0.0, (total_steps - decay_steps) / total_steps)  # Linear decay
+
         scheduler = torch.optim.lr_scheduler.LambdaLR(
-            optimizer, lambda step: min((step + 1) / self.cfg.optimizer.warmup_steps, 1.0)
+            optimizer, lr_lambda
         )
         return [optimizer], [{"scheduler": scheduler, "interval": "step"}]
 
@@ -138,9 +158,11 @@ def main(cfg: DictConfig):
         tokenizer, device="cuda" if torch.cuda.is_available() else "cpu"
     )
     val_dataset_names=['val_easy', 'val_medium', 'val_hard']
-    model = LLM(GPT(conf), preprocessor=preprocessor, config=conf)
+    model = LLM(Llama(conf), preprocessor=preprocessor, config=conf)
+    formula_end_token_id = tokenizer.encode("FORMULA_END", add_special_tokens=False)[0]
 
-    lit_model = LitLLM(model=model, cfg=cfg, preprocessor=preprocessor, val_dataset_names=val_dataset_names)
+    lit_model = LitLLM(model=model, cfg=cfg, preprocessor=preprocessor, val_dataset_names=val_dataset_names,
+                       delimiter_token_id=formula_end_token_id)
     datasets = get_data(cfg, tokenizer)
     data = Datamodule(datasets, batch_size, num_workers, tokenizer)
 

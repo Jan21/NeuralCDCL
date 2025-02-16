@@ -112,7 +112,7 @@ def get_data(cfg: DictConfig, tokenizer):
             [tokenizer.bos_token + text.strip() + tokenizer.eos_token for text in element["text"]],
             truncation=True,
             max_length=cfg.model.block_size,
-            padding="max_length",
+            padding="longest",
         )
         return {"input_ids": outputs["input_ids"]}
 

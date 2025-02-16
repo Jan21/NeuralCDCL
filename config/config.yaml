@@ -1,17 +1,10 @@
-defaults:  
-  - _self_  
-  - override hydra/hydra_logging: disabled  
-  - override hydra/job_logging: disabled  
-  
-hydra:  
-  output_subdir: null  
-  run:  
+defaults:  - _self_  - override hydra/hydra_logging: disabled  - override hydra/job_logging: disabled  hydra:  output_subdir: null  run:  
     dir: .
 
 general:
   project: "SAT"
-  run_name: "Pythia-6-4-128-dfs (Training on easy)"
-  devices: [1]
+  run_name: "Pythia-6-8-512-dfs (Training on easy)"
+  devices: [2]
 
 tok_data:
   train_file: "../data/cdcl_easy.json"
@@ -32,13 +25,13 @@ data:
 
 model:
   name: "Pythia-${model.n_layer}-${model.n_head}-${model.n_embd}-dfs"
-  batch_size: 32
-  accumulate_grad_batches: 1
-  block_size: 4096
+  batch_size: 16
+  accumulate_grad_batches: 4
+  block_size: 1024
   epochs: 10
   n_layer: 6
-  n_head: 4
-  n_embd: 128
+  n_head: 8
+  n_embd: 512
   vocab_size: 56
   padded_vocab_size: 56
   bos_id: 52
@@ -47,10 +40,10 @@ model:
   tokenizer_path: "model/${dl_model.full_path}"
 
 optimizer:
-  warmup_steps: 4000
-  lr: 5e-4
+  warmup_steps: 500
+  lr: 1e-4
   weight_decay: 0.01
-  betas: [0.9, 0.95]
+  betas: [0.9, 0.999]
 
 eval:
   config_path: "${model.checkpoint_dir}/model_config.json"
@@ -58,8 +51,8 @@ eval:
   batch_size: 64
   eval_interval: 10
   results_dir: "data/eval_results/${model.name}"
-  log_step_frequency: 200
-  val_check_interval: 0.5
+  log_step_frequency: 50
+  val_check_interval: 0.2
   callback_epoch_frequency: 1
   callback_acc_data_count: 20
 
