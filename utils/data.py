@@ -82,9 +82,7 @@ def get_data(cfg: DictConfig, tokenizer):
             f"train_{cfg.data.train_data}": to_absolute_path(
                 os.path.join(cfg.data.datapath, cfg.data[f"train_file_{cfg.data.train_data}"])
             ),
-            "val_easy": to_absolute_path(os.path.join(cfg.data.datapath, cfg.data.val_file_easy)),
-            "val_medium": to_absolute_path(os.path.join(cfg.data.datapath, cfg.data.val_file_medium)),
-            "val_hard": to_absolute_path(os.path.join(cfg.data.datapath, cfg.data.val_file_hard)),
+            "val_easy": to_absolute_path(os.path.join(cfg.data.datapath, cfg.data.val_file)),
         },
     )
 

@@ -8,14 +8,14 @@ from utils.data import *
 import hydra
 from lightning.pytorch.loggers import WandbLogger
 from omegaconf import DictConfig, OmegaConf
-from callbacks.eval_callback import EvalCallback
+from callbacks.eval_callback import UnitPropEvaluator
 from callbacks.save_callback import SaveBeforeEvalCallback
 from training_callback import TrainingCallback
 from config import hf_config
 from litgpt.config import configs, Config, name_to_config
-from litgpt.model import GPT, Llama
+from litgpt.model import GPT
+from callbacks.eval_callback import UnitPropEvaluator
 from litgpt.api import Preprocessor
-
 import json
 import os
 import wandb
@@ -75,8 +75,44 @@ class LitLLM(L.LightningModule):
         )
         targets = self.mask_targets(idx, targets)
         _, loss = self(idx, targets)
+
+        
         self.log(f"loss_{self.val_dataset_names[dataloader_idx]}", loss, on_epoch=True, sync_dist=True, prog_bar=True)
         return {f"loss_{self.val_dataset_names[dataloader_idx]}": loss, "dataset": self.val_dataset_names[dataloader_idx]}
+
+
+    def on_validation_epoch_end(self):
+        test = self.trainer.datamodule.dataset["val_easy"]
+
+        save_path = self.cfg.convert_hf.in_path
+        self.llm.model.to(self.llm.preprocessor.device)
+        self.llm.save(save_path)
+
+        self.llm.model.to(self.device)
+
+        evaluator = UnitPropEvaluator(
+            self.cfg,
+            test,
+            self.preprocessor.tokenizer,
+            self.global_step,
+            self.llm.model,
+        )
+        acc, acc_tokens = evaluator.evaluate()
+        self.log(
+            "UnitPropEvaluation/acc",
+            acc,
+            on_epoch=True,
+            prog_bar=True,
+            sync_dist=True,
+
+        )
+        self.log(
+            "UnitPropEvaluation/acc_tokens",
+            acc_tokens,
+            on_epoch=True,
+            prog_bar=True,
+            sync_dist=True,
+        )
 
     def configure_optimizers(self):
         betas = self.cfg.optimizer.betas
@@ -158,11 +194,14 @@ def main(cfg: DictConfig):
         tokenizer, device="cuda" if torch.cuda.is_available() else "cpu"
     )
     val_dataset_names=['val_easy', 'val_medium', 'val_hard']
-    model = LLM(Llama(conf), preprocessor=preprocessor, config=conf)
-    formula_end_token_id = tokenizer.encode("FORMULA_END", add_special_tokens=False)[0]
+    model = LLM(GPT(conf), preprocessor=preprocessor, config=conf)
+    model.load(cfg.convert_hf.in_path)
+    print("loaded model")
+    formula_end_token_id = tokenizer.encode("begin", add_special_tokens=False)[0]
 
     lit_model = LitLLM(model=model, cfg=cfg, preprocessor=preprocessor, val_dataset_names=val_dataset_names,
                        delimiter_token_id=formula_end_token_id)
+
     datasets = get_data(cfg, tokenizer)
     data = Datamodule(datasets, batch_size, num_workers, tokenizer)
 
@@ -188,13 +227,13 @@ def main(cfg: DictConfig):
         accumulate_grad_batches=accumulate_grad_batches,
         precision="bf16-true",
         val_check_interval=cfg.eval.val_check_interval,
-        callbacks=[TrainingCallback(
-            epoch_frequency=cfg.eval.callback_epoch_frequency,
-            tokenizer=tokenizer,
-            max_length=cfg.model.block_size,
-            acc_sample_size=cfg.eval.callback_acc_data_count,
-            val_dataset_names=['val_easy', 'val_medium', 'val_hard'])
-        ],
+        # callbacks=[TrainingCallback(
+        #     epoch_frequency=cfg.eval.callback_epoch_frequency,
+        #     tokenizer=tokenizer,
+        #     max_length=cfg.model.block_size,
+        #     acc_sample_size=cfg.eval.callback_acc_data_count,
+        #     val_dataset_names=['val_easy', 'val_medium', 'val_hard'])
+        # ],
         logger=logger,
         log_every_n_steps=cfg.eval.log_step_frequency
     )

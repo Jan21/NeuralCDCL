@@ -1,25 +1,23 @@
-defaults:  - _self_  - override hydra/hydra_logging: disabled  - override hydra/job_logging: disabled  hydra:  output_subdir: null  run:  
-    dir: .
+defaults:  
+  - _self_  
+  - override hydra/hydra_logging: disabled  
+  - override hydra/job_logging: disabled  
 
 general:
   project: "SAT"
   run_name: "Pythia-6-8-512-dfs (Training on easy)"
-  devices: [2]
+  devices: [0]
 
 tok_data:
-  train_file: "../data/cdcl_easy.json"
+  train_file: "../temp/cdcl_train.json"
   tokenizer_path: "${model.tokenizer_path}/tokenizer.json"
 
 data:
-  datapath: data
-  train_file_easy: "cdcl_easy_train.json"
-  val_file_easy: "cdcl_easy_val.json"
-  train_file_medium: "cdcl_medium_train.json"
-  val_file_medium: "cdcl_medium_val.json"
-  train_file_hard: "cdcl_hard_train.json"
-  val_file_hard: "cdcl_hard_val.json"
+  datapath: temp
+  train_file_easy: "cdcl_train.json"
+  val_file: "cdcl_test.json"
   train_data: "easy"
-  num_train: 100000
+  num_train: 15000
   num_eval: 1000
   num_workers: 64
 
@@ -28,14 +26,14 @@ model:
   batch_size: 16
   accumulate_grad_batches: 4
   block_size: 1024
-  epochs: 10
+  epochs: 30
   n_layer: 6
-  n_head: 8
-  n_embd: 512
-  vocab_size: 56
-  padded_vocab_size: 56
-  bos_id: 52
-  eos_id: 55
+  n_head: 4
+  n_embd: 128
+  vocab_size: 36
+  padded_vocab_size: 36
+  bos_id: 31
+  eos_id: 34
   checkpoint_dir: "model/${dl_model.full_path}"
   tokenizer_path: "model/${dl_model.full_path}"
 

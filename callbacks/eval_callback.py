@@ -1,3 +1,7 @@
+import warnings
+
+warnings.simplefilter(action="ignore", category=FutureWarning)
+
 from transformers import TrainerCallback
 from lightning.pytorch.callbacks import Callback
 import os
@@ -7,12 +11,14 @@ import numpy as np
 import wandb
 import pandas as pd
 from datetime import datetime
-#from utils.countdown_utils import *
 from tqdm import trange
 from pathlib import Path
 from transformers import AutoConfig, AutoModelForCausalLM
 from litgpt.scripts.convert_lit_checkpoint import convert_lit_checkpoint
 from litgpt.utils import copy_config_files, auto_download_checkpoint
+import torch
+from pathlib import Path
+from datetime import datetime
 
 
 def convert_litgpt_to_hf(cfg):
@@ -33,235 +39,188 @@ def convert_litgpt_to_hf(cfg):
         torch_dtype=torch.bfloat16,
         local_files_only=True,
         state_dict=state_dict,
-        attn_implementation="flash_attention_2",
+        #attn_implementation="flash_attention_2",
     )
     return hf_model
 
 
-class EvalCallback(Callback):
-    def __init__(
-        self,
-        data_dir,
-        eval_data,
-        tokenizer,
-        num_examples=128,
-        batch_size=64,
-        save_path=None,
-        config=None,
-        eval_interval=1000,
-    ):
-        super().__init__()
-        self.data_dir = data_dir
-        self.eval_data = eval_data
-        self.num_examples = num_examples
-        self.batch_size = batch_size
-        self.tokenizer = tokenizer
-        self.last_eval_step = -1  # Initialize to -1
+class UnitPropEvaluator:
+    def __init__(self, config, test_set, tokenizer, step=None, model=None):
         self.config = config
-        self.hf_model = None
-        self.eval_interval = eval_interval
-        self.save_path = save_path
-
-        # Load evaluation data once
-        data_file = os.path.join(self.data_dir, self.eval_data)
-        with open(data_file, "r") as json_file:
-            self.data = json.load(json_file)
-
-        # Create results directory if it doesn't exist
-        self.results_dir = self.config.eval.results_dir
+        self.num_examples = config.eval.num_examples
+        self.batch_size = config.eval.batch_size
+        self.global_step = step
+        self.tokenizer = tokenizer
+        self.results_dir = config.eval.results_dir
+        self.model = model
+        self.hf_model = convert_litgpt_to_hf(config)
+        self.test_set = test_set
+        self.step = step
         os.makedirs(self.results_dir, exist_ok=True)
 
-        # Initialize results DataFrame
-        self.csv_path = os.path.join(self.results_dir, "eval_results.csv")
-        if os.path.exists(self.csv_path):
-            self.results_df = pd.read_csv(self.csv_path)
-        else:
-            self.results_df = pd.DataFrame(
-                columns=[
-                    "step",
-                    "timestamp",
-                    "average_rating",
-                    "average_true_rating",
-                    "accuracy",
-                    "true_accuracy",
-                    "predictions",
-                ]
-            )
+        self.prompts = self.get_prompts()
 
-    def eval_ll(
-        self,
-        model,
-        tokenizer,
-        data,
-        batch_size=128,
-        context_len=4096,
-        temperature=0.0,
-        n=1,
-    ):
-        """
-        Evaluate the model on the data using a sliding window so that the context length is not exceeded
-        """
-        output_texts_concat = []
+    def get_prompts(self):
+        search_token_id = self.tokenizer.encode("begin", add_special_tokens=False)[0]
+
+        prompts = []
+        for sample in self.test_set:
+            input_ids = sample["input_ids"]
+            split_index = input_ids.index(search_token_id)
+            
+            # Take everything up to Search: token
+            prompt_ids = input_ids[: split_index + 1]
+            target_ids = input_ids[split_index + 1:]
+            # Decode to text, add BOS token at start
+            prompt_text = self.tokenizer.decode(prompt_ids, skip_special_tokens=True)
+            full_prompt = self.tokenizer.bos_token + " "+ prompt_text
+
+            # Re-encode with BOS token
+            prompt_with_bos = self.tokenizer.encode(
+                full_prompt, add_special_tokens=False
+            )
+            prompts.append((prompt_with_bos, target_ids))
+
+        return prompts
+
+    def get_preds(self):
+        batch_size = self.batch_size
+        data = self.prompts
+        tokenizer = self.tokenizer
+        output_data_concat = []
+
+        self.hf_model.cuda()
+        self.hf_model.eval()
+
         for b in trange(0, len(data), batch_size):
             batch = data[b : min(b + batch_size, len(data))]
-            output_texts = ["" for _ in range(len(batch))]
+            targets = [x[1] for x in batch]
+            batch = [x[0] for x in batch]
+
+            batch_text = [tokenizer.decode(x, skip_special_tokens=False) for x in batch]
             tokenizer.padding_side = "left"
-            inputs = tokenizer(batch, return_tensors="pt", padding=True).to("cuda")
-            inputs = inputs["input_ids"]
+            inputs = tokenizer(batch_text, return_tensors="pt", padding=True).to("cuda")
+            input_prompt = inputs["input_ids"]
+            #output_texts = ["" for _ in range(len(batch))]
 
-            if n == 1:
-                outputs = model.generate(
-                    input_ids=inputs,
-                    pad_token_id=tokenizer.eos_token_id,
-                    attention_mask=torch.ones_like(inputs),
-                    max_length=context_len,
-                    num_beams=1,
-                    do_sample=False,
-                )
-                output_tokens = outputs
-                output_text = tokenizer.batch_decode(
-                    output_tokens, skip_special_tokens=False
-                )
-                tokenizer.padding_side = "left"
-                output_texts = [
-                    ot + ot_now for ot, ot_now in zip(output_texts, output_text)
-                ]
-                output_texts_concat += output_texts
+            outputs = self.hf_model.generate(
+                input_ids=input_prompt,
+                pad_token_id=tokenizer.pad_token_id,
+                attention_mask=inputs["attention_mask"].to("cuda"),
+                max_length=self.config.model.block_size,
+                num_beams=1,
+                do_sample=False,
+                eos_token_id=tokenizer.eos_token_id,
+            )
+        
+            output_text = tokenizer.batch_decode(outputs, skip_special_tokens=False)
 
-        return output_texts_concat
-
-    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
-        # Only run evaluation at specified intervals and if we haven't evaluated at this step
-        if (
-            trainer.global_step % self.eval_interval == 0
-            and trainer.global_step > self.last_eval_step
-            and trainer.is_global_zero
-        ):
-            print(f"Saving model before evaluation...")
-            pl_module.llm.model.to(pl_module.llm.preprocessor.device)
-            pl_module.llm.save(self.save_path)
-            self.run_evaluation(trainer, pl_module)
-
-    def run_evaluation(self, trainer, pl_module):
-        print(f"\nRunning custom countdown evaluation at step {trainer.global_step}")
-
-        try:
-            self.hf_model = convert_litgpt_to_hf(self.config)
-            self.hf_model.cuda()
-            self.hf_model.eval()
-
-            # Prepare evaluation data
-            test_prompts = [
-                self.tokenizer.bos_token
-                + f"S {sample['target']} [ {' '.join(map(str,sample['nums']))} ] ,"
-                for sample in self.data[: self.num_examples]
+            output_data = [
+                (tg,ou,out) for tg,ou,out in zip(targets, outputs, output_text)
             ]
-            len_nums = [
-                len(sample["nums"]) for sample in self.data[: self.num_examples]
-            ]
-            data_4 = [d for d, l in zip(test_prompts, len_nums) if l == 4]
+            output_data_concat += output_data
 
-            # Get predictions
-            predictions = self.eval_ll(
-                self.hf_model,
-                self.tokenizer,
-                data_4,
-                batch_size=self.batch_size,
-                context_len=4096,
-                temperature=0.0,
-                n=1,
+        return output_data_concat
+
+    def save(self, predictions, reasons):
+        eval_dir = os.path.join(self.config.eval.results_dir, f"step_{self.step}")
+        os.makedirs(eval_dir, exist_ok=True)
+        results_file = os.path.join(eval_dir, f"results_{self.num_examples}.json")
+        with open(results_file, "w") as f:
+            json.dump(
+                {"predictions": predictions, "reasons": reasons},
+                f,
+                indent=4,
             )
 
-            # Calculate metrics
-            pred_ratings = []
-            true_rating = []
-            pred_reasons = []
+    def evaluate(self):
+        preds = self.get_preds()
+        correct = 0
+        begin_token_id = self.tokenizer.encode("begin", add_special_tokens=False)[0]
+        eos_token_id = self.tokenizer.eos_token_id
+        correct_tokens = []
+        for pred in preds:
+            output =  pred[1].tolist()
+            start_pos = output.index(begin_token_id)
+            try:
+                end_pos = output.index(eos_token_id)
+            except:
+                end_pos = len(output)
+            end_pos_target = pred[0].index(eos_token_id)
+            output = output[start_pos+1:end_pos]
+            target = pred[0][:end_pos_target]
+            if output == target:
+                correct += 1
+            for i in range(len(target)):
+                correct_tokens.append(output[i] == target[i])
+        acc = correct / len(preds)
+        acc_tokens = sum(correct_tokens) / len(correct_tokens)
 
-            for i in range(len(predictions)):
-                rating, reason = metric_fn(
-                    predictions[i].split(self.tokenizer.bos_token)[1], mode="sft"
-                )
-                tr, _ = metric_fn(f"{self.data[i]['search_path']}", mode="sft")
-                pred_ratings.append(rating)
-                true_rating.append(tr)
-                pred_reasons.append(reason)
+        #self.save(preds, reasons)
+        del self.hf_model
+        torch.cuda.empty_cache()
 
-            pred_ratings = np.array(pred_ratings)
-            avg_rating = float(np.mean(pred_ratings))
-            avg_true_rating = float(np.mean(true_rating))
-            accuracy = float(np.mean([r > 0 for r in pred_ratings]))
-            true_accuracy = float(np.mean([r > 0 for r in true_rating]))
+        return acc, acc_tokens
 
-            # Save detailed results
-            eval_dir = os.path.join(
-                self.config.eval.results_dir, f"step_{trainer.global_step}"
-            )
-            os.makedirs(eval_dir, exist_ok=True)
 
-            results_file = os.path.join(
-                eval_dir,
-                f"results_{self.num_examples}_{self.eval_data.replace('/','_')}",
-            )
-            with open(results_file, "w") as f:
-                json.dump(
-                    {
-                        "trajectories": predictions,
-                        "ratings": pred_ratings.tolist(),
-                        "reasons": pred_reasons,
-                        "test_prompts": test_prompts,
-                    },
-                    f,
-                    indent=4,
-                )
+def parse_and_validate(input_string):
+    import re
 
-            self.last_eval_step = trainer.global_step
+    # Crop the input string at the first occurrence of 'END'
+    end_index = input_string.find("END")
+    if end_index != -1:
+        input_string = input_string[:end_index]
 
-            # Log using the trainer's logger instead of wandb directly
-            metrics = {
-                "countdown_eval/average_rating": avg_rating,
-                "countdown_eval/average_true_rating": avg_true_rating,
-                "countdown_eval/accuracy": accuracy,
-                "countdown_eval/true_accuracy": true_accuracy,
-            }
+    # Helper function to convert bracketed content to a dictionary
+    def parse_dict(data_str):
+        entries = data_str.strip("[]").split(",")
+        result_dict = {}
+        for entry in entries:
+            parts = entry.split(":")
+            if len(parts) == 2:
+                try:
+                    key, value = int(parts[0].strip()), int(parts[1].strip())
+                    result_dict[key] = value
+                except ValueError:
+                    continue  # Ignore malformed entries
+        return result_dict
 
-            # Use trainer's logger to log metrics
-            for key, value in metrics.items():
-                trainer.logger.log_metrics({key: value}, step=trainer.global_step)
-            print("Successfully logged countdown evaluation metrics")
+    # Extract Goal
+    goal_match = re.search(r"Goal: \[(.*?)\]", input_string)
+    if goal_match:
+        goal = parse_dict(goal_match.group(1))
+    else:
+        return "Invalid input - Goal not found."
 
-            # Save to CSV
-            if not any(self.results_df["step"] == trainer.global_step):
-                new_row = pd.DataFrame(
-                    [
-                        {
-                            "step": trainer.global_step,
-                            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            "average_rating": avg_rating,
-                            "average_true_rating": avg_true_rating,
-                            "accuracy": accuracy,
-                            "true_accuracy": true_accuracy,
-                            "predictions": json.dumps(predictions),
-                        }
-                    ]
-                )
+    # Find the last occurrence of 'CS' and the immediately following 'CG'
+    cs_matches = list(re.finditer(r"CS: \[(.*?)\]", input_string))
+    cg_matches = list(re.finditer(r"CG: \[(.*?)\]", input_string))
 
-                self.results_df = pd.concat(
-                    [self.results_df, new_row], ignore_index=True
-                )
-                self.results_df.to_csv(self.csv_path, index=False)
+    if not cs_matches:
+        return "Invalid input - CS not found."
+    if not cg_matches:
+        return "Invalid input - CG not found."
 
-            # Print results summary
-            print("\nResults Summary:")
-            print(f"Average rating: {avg_rating}")
-            print(f"Average true rating: {avg_true_rating}")
-            print(f"Accuracy: {accuracy}")
-            print(f"True Accuracy: {true_accuracy}")
+    # Get the last occurrences
+    last_cs = cs_matches[-1]
+    # Find the next CG after the last CS
+    for match in cg_matches:
+        if match.start() > last_cs.start():
+            last_cg = match
+            break
+    else:
+        return "Invalid input - CG not properly placed after last CS."
 
-        except Exception as e:
-            print(f"Error during countdown evaluation: {e}")
-            raise e
+    # Parse the last CS and CG
+    current_state = parse_dict(last_cs.group(1))
+    change_goal = parse_dict(last_cg.group(1))
 
-        finally:
-            # Cleanup
-            del self.hf_model
-            torch.cuda.empty_cache()
+    # Update current state based on change goal
+    for index, value in change_goal.items():
+        if index in current_state:
+            current_state[index] = value
+
+    # Compare updated current state with the goal
+    is_valid = current_state == goal
+
+    return "valid" if is_valid else "invalid"
