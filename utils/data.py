@@ -114,7 +114,7 @@ def get_data(cfg: DictConfig, tokenizer):
             max_length=cfg.model.block_size,
             padding="longest",
         )
-        return {"input_ids": outputs["input_ids"]}
+        return {"input_ids": outputs["input_ids"], "attention_mask": outputs["attention_mask"]}
 
     tokenized_dataset = hf_dataset.map(tokenize_padded, batched=True, remove_columns=hf_dataset[f"train_{cfg.data.train_data}"].column_names)
 

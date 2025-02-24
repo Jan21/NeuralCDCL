@@ -10,10 +10,10 @@ from lightning.pytorch.loggers import WandbLogger
 from omegaconf import DictConfig, OmegaConf
 from callbacks.eval_callback import EvalCallback
 from callbacks.save_callback import SaveBeforeEvalCallback
-from training_callback import TrainingCallback
+from callbacks.training_callback import TrainingCallback
 from config import hf_config
 from litgpt.config import configs, Config, name_to_config
-from litgpt.model import GPT, Llama
+from litgpt.model import GPT
 from litgpt.api import Preprocessor
 
 import json
@@ -48,19 +48,18 @@ class LitLLM(L.LightningModule):
             json.dump(self.hf_conf, f, indent=2)
 
     def mask_targets(self, input_ids, target_ids):
-        # Create a mask for all positions up to and including the first occurrence of search_token_id
         first_search_pos = (input_ids == self.delimiter_token_id).cumsum(dim=1).bool()
         mask = ~first_search_pos.cumsum(dim=1).bool()
         # Apply the mask to targets, setting masked positions to -100
         return torch.where(mask, torch.tensor(-100, device=target_ids.device), target_ids)
 
     def training_step(self, batch: torch.Tensor, batch_idx: int) -> torch.Tensor:
-        idx, targets, att_mask = (
+        idx, targets_no_mask, att_mask = (
             batch["input_ids"],
             batch["labels"],
             batch["attention_mask"],
         )
-        targets = self.mask_targets(idx, targets)
+        targets = self.mask_targets(idx, targets_no_mask)
         _, loss = self(idx, targets)
         self.log("train_loss", loss, sync_dist=True)
         current_lr = self.trainer.optimizers[0].param_groups[0]['lr']
@@ -92,7 +91,7 @@ class LitLLM(L.LightningModule):
                 return (step + 1) / self.cfg.optimizer.warmup_steps  # Warm-up phase
             else:
                 # After warm-up, we apply linear decay
-                total_steps = (self.cfg.data.num_train / self.cfg.eval.batch_size) * self.cfg.model.epochs
+                total_steps = (self.cfg.data.num_train / (self.cfg.model.batch_size * self.cfg.model.accumulate_grad_batches)) * self.cfg.model.epochs
                 decay_steps = step - self.cfg.optimizer.warmup_steps
                 return max(0.0, (total_steps - decay_steps) / total_steps)  # Linear decay
 
@@ -108,34 +107,36 @@ class LitLLM(L.LightningModule):
 
     def generate(
         self,
-        input_ids: torch.Tensor,
+        inputs: list[torch.Tensor],
         max_length: int,
+        stop_token: int,
         temperature: float = 1.0,
-    ) -> torch.Tensor:
+    ) -> list[torch.Tensor]:
         """
-        Generate text using the model.
-
-        Args:
-            input_ids (torch.Tensor): Input token IDs of shape (batch_size, seq_len).
-            max_length (int): Maximum length of the generated sequence.
-            temperature (float): Sampling temperature. Lower values make the model more deterministic.
-
-        Returns:
-            torch.Tensor: Generated token IDs of shape (batch_size, generated_seq_len).
+        Generate text using the model, handling variable input lengths properly.
         """
         self.eval()
-        generated = input_ids
+        generated_sequences = []
 
-        for _ in range(max_length - input_ids.size(1)):
-            with torch.no_grad():
-                logits = self(generated)[:, -1, :]  # (batch_size, vocab_size)
+        for input_ids in inputs:
+            current_input = torch.tensor(input_ids, device=self.device).unsqueeze(0)  # Shape (1, seq_len)
+            generated = current_input
 
-            logits = logits / temperature
-            probs = torch.softmax(logits, dim=-1)
-            next_token = torch.multinomial(probs, num_samples=1)  # (batch_size, 1)
-            generated = torch.cat([generated, next_token], dim=-1)
+            for _ in range(max_length - current_input.size(1)):
+                with torch.no_grad():
+                    logits = self(generated)[:, -1, :]  # (1, vocab_size)
 
-        return generated
+                logits = logits / temperature
+                probs = torch.softmax(logits, dim=-1)
+                next_token = torch.multinomial(probs, num_samples=1)  # (1, 1)
+                generated = torch.cat([generated, next_token], dim=-1)
+
+                if next_token.item() == stop_token:
+                    break
+
+            generated_sequences.append(generated)
+
+        return generated_sequences
 
 
 @hydra.main(config_path="config", config_name="config", version_base=None)
@@ -158,11 +159,11 @@ def main(cfg: DictConfig):
         tokenizer, device="cuda" if torch.cuda.is_available() else "cpu"
     )
     val_dataset_names=['val_easy', 'val_medium', 'val_hard']
-    model = LLM(Llama(conf), preprocessor=preprocessor, config=conf)
-    formula_end_token_id = tokenizer.encode("FORMULA_END", add_special_tokens=False)[0]
+    model = LLM(GPT(conf), preprocessor=preprocessor, config=conf)
+    trace_start_token_id = tokenizer.encode("TRACE_START", add_special_tokens=False)[0]
 
     lit_model = LitLLM(model=model, cfg=cfg, preprocessor=preprocessor, val_dataset_names=val_dataset_names,
-                       delimiter_token_id=formula_end_token_id)
+                       delimiter_token_id=trace_start_token_id)
     datasets = get_data(cfg, tokenizer)
     data = Datamodule(datasets, batch_size, num_workers, tokenizer)
 
@@ -186,7 +187,8 @@ def main(cfg: DictConfig):
         devices=cfg.general.devices,
         max_epochs=cfg.model.epochs,
         accumulate_grad_batches=accumulate_grad_batches,
-        precision="bf16-true",
+        precision="16-mixed",
+        # precision="bf16-true",
         val_check_interval=cfg.eval.val_check_interval,
         callbacks=[TrainingCallback(
             epoch_frequency=cfg.eval.callback_epoch_frequency,
