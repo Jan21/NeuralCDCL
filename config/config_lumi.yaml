@@ -10,7 +10,7 @@ hydra:
 
 general:
   project: "SAT"
-  devices: [1]
+  devices: 1
 
 tok_data:
   train_file: "../data/cdcl_dataset.json"
@@ -31,11 +31,11 @@ data:
 
 model:
   name: "Pythia-${model.n_layer}-${model.n_head}-${model.n_embd}"
-  batch_size: 16
-  accumulate_grad_batches: 4
+  batch_size: 128
+  accumulate_grad_batches: 1
   block_size: 4096
-  epochs: 40
-  n_layer: 6
+  epochs: 200
+  n_layer: 12
   n_head: 8
   n_embd: 512
   vocab_size: 66

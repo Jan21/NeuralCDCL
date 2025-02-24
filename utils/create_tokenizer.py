@@ -18,18 +18,21 @@ def main(cfg: DictConfig):
     tokenizer = get_tokenizer(vocab, cfg)
 
 def get_tokenizer(vocab, cfg):
-    vocab = {s:i for i,s in enumerate(vocab.union({'[UNK]'}))}
+    vocab = {s: i for i, s in enumerate(vocab)}
+    # Initialize tokenizer with complete vocabulary
     tokenizer = Tokenizer(WordLevel(vocab, unk_token="[UNK]"))
-    tokenizer.pre_tokenizer=WhitespaceSplit()
-    tokenizer.add_special_tokens(['[BOS]', '[PAD]','[MASK]','[UNK]', '[EOS]'])
-    tokenizer_path = to_absolute_path(cfg.tok_data.tokenizer_path)
-    os.makedirs(os.path.dirname(tokenizer_path), exist_ok=True)
-    tokenizer.save(tokenizer_path)
-    print("tokenizer saved to:", tokenizer_path)
+    tokenizer.pre_tokenizer = WhitespaceSplit()
+    tokenizer.add_special_tokens(["[BOS]", "[PAD]", "[MASK]", "[UNK]", "[EOS]"])
+    # Save tokenizer
+    save_path = f"./{cfg.tok_data.tokenizer_path}"
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    tokenizer.save(save_path)
+    print("tokenizer saved to:", save_path)
+
     return tokenizer
 
 def get_vocab(cfg: DictConfig):
-    with open (cfg.data.datapath + "/" + cfg.data.train_file, "rb") as f:
+    with open (cfg.data.datapath + "/" + cfg.tok_data.train_file, "rb") as f:
         train = json.load(f)
 
     data = train

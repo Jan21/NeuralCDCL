@@ -169,7 +169,7 @@ def main(cfg: DictConfig):
 
     data.connect(max_seq_length=cfg.model.block_size)
 
-    logger = WandbLogger(project=cfg.general.project, name=f"{cfg.general.run_name}", config=wandb_config)
+    logger = WandbLogger(project=cfg.general.project, name=f"{cfg.model.name}", config=wandb_config)
 
     # eval_callback = EvalCallback(
     #     data_dir=cfg.data.datapath,

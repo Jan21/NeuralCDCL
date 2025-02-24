@@ -3,6 +3,7 @@ import random
 import numpy as np
 from tqdm import tqdm
 import json
+import os
 
 class CDCLSolver:
     def __init__(self, clauses):
@@ -239,7 +240,9 @@ def remap_variables(data, variable_name_range):
     return data.replace('y', 'x')
 
 
-with open("cdcl_dataset.json", "w") as f:
+
+os.makedirs("data", exist_ok=True)
+with open("data/cdcl_dataset.json", "w") as f:
     data_list = []
     for formula, trace in tqdm(zip(formulas, traces), desc="Writing into a file..."):
         trace_str = ' '.join(trace) 
