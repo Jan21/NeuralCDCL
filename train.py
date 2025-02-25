@@ -139,7 +139,7 @@ class LitLLM(L.LightningModule):
         return generated_sequences
 
 
-@hydra.main(config_path="config", config_name="config", version_base=None)
+@hydra.main(config_path="config", config_name="config_lumi", version_base=None)
 def main(cfg: DictConfig):
     conf, _ = hf_config.get_configs(cfg)
 

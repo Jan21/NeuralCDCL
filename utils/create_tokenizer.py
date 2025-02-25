@@ -32,7 +32,8 @@ def get_tokenizer(vocab, cfg):
     return tokenizer
 
 def get_vocab(cfg: DictConfig):
-    with open (cfg.data.datapath + "/" + cfg.tok_data.train_file, "rb") as f:
+    print(cfg.tok_data.train_file)
+    with open (cfg.tok_data.train_file, "rb") as f:
         train = json.load(f)
 
     data = train

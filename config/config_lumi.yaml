@@ -13,11 +13,11 @@ general:
   devices: 1
 
 tok_data:
-  train_file: "../data/cdcl_dataset.json"
+  train_file: "${data.datapath}/cdcl_hard_train.json"
   tokenizer_path: "tokenizer/tokenizer.json"
 
 data:
-  datapath: data
+  datapath: data/neural_cdcl
   train_file_easy: "${data.datapath}/cdcl_easy_train.json"
   val_file_easy: "${data.datapath}/cdcl_easy_val.json"
   train_file_medium: "${data.datapath}/cdcl_medium_train.json"
