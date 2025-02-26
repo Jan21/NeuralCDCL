@@ -53,13 +53,13 @@ def log_clauses(clauses):
     return (clause_dic_np, lit_dic_np)
 
 def log_clause(clause,i):
-    string = f'c{i} : ( '
+    string = f'( '
     for l in clause:
         if l > 0:
             string += f"+ x{abs(l)} "
         else:
             string += f"- x{abs(l)} "
-    return string.strip() + ' )'
+    return string.strip() + ' ) : c{i}'
 
 def log_clause_list(clause_list):
     string = ''
@@ -86,8 +86,8 @@ class CDCLSolver:
         self.trace = []
 
     def unit_propagate(self,):
-        self.trace.append(f'clauses [ {log_clause_list(self.clauses)} ]')
         self.trace.append(f'assignments: {log_assignments(self.assignments)}')
+        self.trace.append(f'clauses [ {log_clause_list(self.clauses)} ]')
         self.trace.append("UP begin")
         while True:
             self.trace.append('UP iteration')
