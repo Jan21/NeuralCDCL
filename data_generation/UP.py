@@ -59,7 +59,7 @@ def log_clause(clause,i):
             string += f"+ x{abs(l)} "
         else:
             string += f"- x{abs(l)} "
-    return string.strip() + ' ) : c{i}'
+    return string.strip() + f' ) : c{i}'
 
 def log_clause_list(clause_list):
     string = ''
