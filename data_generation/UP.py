@@ -3,7 +3,8 @@ import random
 from collections import defaultdict
 import numpy as np
 import json
-
+from tqdm import tqdm
+import os
 
 def log_clauses(clauses):
     string = 'clauses: '
@@ -51,8 +52,8 @@ def log_clauses(clauses):
         
     return (clause_dic_np, lit_dic_np)
 
-def log_clause(clause):
-    string = '( '
+def log_clause(clause,i):
+    string = f'c{i} : ( '
     for l in clause:
         if l > 0:
             string += f"+ x{abs(l)} "
@@ -62,8 +63,8 @@ def log_clause(clause):
 
 def log_clause_list(clause_list):
     string = ''
-    for clause in clause_list:
-        string += log_clause(clause) + ' , '
+    for i,clause in enumerate(clause_list):
+        string += log_clause(clause,i) + ' , '
     return string[:-3]
 
 def log_assignments(assignments):
@@ -85,26 +86,31 @@ class CDCLSolver:
         self.trace = []
 
     def unit_propagate(self,):
-        self.trace.append(f'clauses: {log_clause_list(self.clauses)}')
+        self.trace.append(f'clauses [ {log_clause_list(self.clauses)} ]')
         self.trace.append(f'assignments: {log_assignments(self.assignments)}')
         self.trace.append("UP begin")
         while True:
             self.trace.append('UP iteration')
             propagated = False
-            for clause in self.clauses + self.learned_clauses:
+            for i,clause in enumerate(self.clauses + self.learned_clauses):
                 status, value = self.evaluate_clause(clause)
                 if status and not value:
-                    self.trace.append(f"found conflict: {log_clause(clause)}") #TODO
-                    self.trace.append('UP end')
+                    self.trace.append(f"found conflict: c{i}") #{log_clause(clause,i)}") #TODO
+                    #self.trace.append('UP end')
+                    propagated = False
                     return clause
                 elif self.is_unit(clause):
-                    self.trace.append(f'unit found: {log_clause(clause)}') # TODO convert clause
+                    self.trace.append(f'unit found: c{i}') # : {log_clause(clause)}') # TODO convert clause
+                    #self.trace.append('UP end')
+                    propagated = False
+                    return clause
                     lit = self.get_unassigned_literal(clause)
                     var = abs(lit)
                     value = lit > 0
-                    self.trace.append(f'variable assigned: x{var} = {value}') #TODO
+                    #self.trace.append(f'variable assigned: x{var} = {value}') #TODO
                     self.assign(var, value, clause)
-                    propagated = True
+                    
+
             if not propagated:
                 self.trace.append("nothing propagated")
                 break
@@ -185,18 +191,20 @@ def generate_random_formula(n_vars, n_clauses=None, clause_length=3):
     return clauses
 
  ######## TEST
+num_vars = 7
 formulas = []
-for i in range(1):
-    formulas.append(generate_random_formula(7))
+for i in tqdm(range(100000)):
+    formulas.append(generate_random_formula(num_vars))
 
 traces =  []
 
 for clauses in formulas:
     solver = CDCLSolver(clauses)
     # Sample random integer n from 3 to 5
-    n = random.randint(3, 5)
+    
+    n = random.randint(2, num_vars-1)
     # Choose n random variables and assign random boolean values
-    vars_to_assign = random.sample(range(1, 8), n)  # Choose n random variables from 1-10
+    vars_to_assign = random.sample(range(1, num_vars+1), n)  # Choose n random variables from 1-10
     for var in vars_to_assign:
         value = random.choice([True, False])
         solver.assignments[var] = value
@@ -212,6 +220,9 @@ train_data = [{"text": trace} for trace in train_traces]
 test_data = [{"text": trace} for trace in test_traces]
 
 # Save to JSON files
+if not os.path.exists("temp"):
+    os.makedirs("temp")
+
 with open("temp/cdcl_train.json", "w") as f:
     json.dump(train_data, f, indent=2)
     

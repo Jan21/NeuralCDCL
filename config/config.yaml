@@ -2,62 +2,49 @@ defaults:
   - _self_  
   - override hydra/hydra_logging: disabled  
   - override hydra/job_logging: disabled  
+  
+hydra:  
+  output_subdir: null  
+  run:  
+    dir: .
 
-general:
-  project: "SAT"
-  run_name: "Pythia-6-8-512-dfs (Training on easy)"
-  devices: [0]
+data_preprocess:
+  raw_data_path: "../data/solved_problems.pkl"
+  num_test: 512
+  num_val: 2048
 
 tok_data:
-  train_file: "../temp/cdcl_train.json"
-  tokenizer_path: "${model.tokenizer_path}/tokenizer.json"
+  train_file: "temp/cdcl_train.json"
+  val_file: "temp/cdcl_test.json"
+  tokenizer_path: "tokenizer/tokenizer.json"
 
 data:
   datapath: temp
-  train_file_easy: "cdcl_train.json"
+  train_file: "cdcl_train.json"
   val_file: "cdcl_test.json"
-  train_data: "easy"
-  num_train: 15000
-  num_eval: 1000
-  num_workers: 64
-
+  num_workers: 8
+  split_str: "UP iteration ;"
 model:
-  name: "Pythia-${model.n_layer}-${model.n_head}-${model.n_embd}-dfs"
-  batch_size: 16
-  accumulate_grad_batches: 4
-  block_size: 1024
-  epochs: 30
+  name: "Pythia-${model.n_layer}-${model.n_head}-${model.n_embd}-cylinder-4-increasing-new_valid"
+  batch_size: 32
+  accumulate_grad_batches: 1
+  block_size: 512
+  epochs: 100
   n_layer: 6
   n_head: 4
-  n_embd: 128
-  vocab_size: 36
-  padded_vocab_size: 36
-  bos_id: 31
-  eos_id: 34
-  checkpoint_dir: "model/${dl_model.full_path}"
-  tokenizer_path: "model/${dl_model.full_path}"
+  n_embd: 64
+  vocab_size: 80
+  padded_vocab_size: 80
+  bos_id: 72
+  eos_id: 76
 
-optimizer:
-  warmup_steps: 500
-  lr: 1e-4
-  weight_decay: 0.01
-  betas: [0.9, 0.999]
+optim:
+  lr: 1e-2
 
 eval:
-  config_path: "${model.checkpoint_dir}/model_config.json"
-  num_examples: 128
+  num_examples: ${data_preprocess.num_test}
   batch_size: 64
-  eval_interval: 10
   results_dir: "data/eval_results/${model.name}"
-  log_step_frequency: 50
-  val_check_interval: 0.2
-  callback_epoch_frequency: 1
-  callback_acc_data_count: 20
-
-dl_model:
-  model_folder: "checkpoints"
-  name: "EleutherAI/pythia-160m"
-  full_path: "${dl_model.model_folder}/${dl_model.name}/"
 
 convert_hf:
   in_path: "temp/${model.name}"

@@ -1,2 +1,2 @@
-# NeuralCDCL
-experiments with transformer imitating CDCL solver
+# basic_transformer
+basic nanoGPT 

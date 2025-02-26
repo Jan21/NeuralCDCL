@@ -39,13 +39,13 @@ def convert_litgpt_to_hf(cfg):
         torch_dtype=torch.bfloat16,
         local_files_only=True,
         state_dict=state_dict,
-        #attn_implementation="flash_attention_2",
+        attn_implementation="flash_attention_2",
     )
     return hf_model
 
 
-class UnitPropEvaluator:
-    def __init__(self, config, test_set, tokenizer, step=None, model=None):
+class Evaluator:
+    def __init__(self, config, test_set, tokenizer, split_str,step=None, model=None):
         self.config = config
         self.num_examples = config.eval.num_examples
         self.batch_size = config.eval.batch_size
@@ -56,30 +56,30 @@ class UnitPropEvaluator:
         self.hf_model = convert_litgpt_to_hf(config)
         self.test_set = test_set
         self.step = step
+        self.split_str = split_str
         os.makedirs(self.results_dir, exist_ok=True)
 
         self.prompts = self.get_prompts()
 
     def get_prompts(self):
-        search_token_id = self.tokenizer.encode("begin", add_special_tokens=False)[0]
+        search_token_id = self.tokenizer.encode(self.split_str, add_special_tokens=False)[0]
 
         prompts = []
         for sample in self.test_set:
             input_ids = sample["input_ids"]
             split_index = input_ids.index(search_token_id)
-            
             # Take everything up to Search: token
             prompt_ids = input_ids[: split_index + 1]
-            target_ids = input_ids[split_index + 1:]
+
             # Decode to text, add BOS token at start
             prompt_text = self.tokenizer.decode(prompt_ids, skip_special_tokens=True)
-            full_prompt = self.tokenizer.bos_token + " "+ prompt_text
+            full_prompt = self.tokenizer.bos_token + " " + prompt_text
 
             # Re-encode with BOS token
             prompt_with_bos = self.tokenizer.encode(
                 full_prompt, add_special_tokens=False
             )
-            prompts.append((prompt_with_bos, target_ids))
+            prompts.append(prompt_with_bos)
 
         return prompts
 
@@ -87,21 +87,18 @@ class UnitPropEvaluator:
         batch_size = self.batch_size
         data = self.prompts
         tokenizer = self.tokenizer
-        output_data_concat = []
+        output_texts_concat = []
 
         self.hf_model.cuda()
         self.hf_model.eval()
 
         for b in trange(0, len(data), batch_size):
             batch = data[b : min(b + batch_size, len(data))]
-            targets = [x[1] for x in batch]
-            batch = [x[0] for x in batch]
-
             batch_text = [tokenizer.decode(x, skip_special_tokens=False) for x in batch]
             tokenizer.padding_side = "left"
             inputs = tokenizer(batch_text, return_tensors="pt", padding=True).to("cuda")
             input_prompt = inputs["input_ids"]
-            #output_texts = ["" for _ in range(len(batch))]
+            output_texts = ["" for _ in range(len(batch))]
 
             outputs = self.hf_model.generate(
                 input_ids=input_prompt,
@@ -112,15 +109,15 @@ class UnitPropEvaluator:
                 do_sample=False,
                 eos_token_id=tokenizer.eos_token_id,
             )
-        
+
             output_text = tokenizer.batch_decode(outputs, skip_special_tokens=False)
 
-            output_data = [
-                (tg,ou,out) for tg,ou,out in zip(targets, outputs, output_text)
+            output_texts = [
+                ot + ot_now for ot, ot_now in zip(output_texts, output_text)
             ]
-            output_data_concat += output_data
+            output_texts_concat += output_texts
 
-        return output_data_concat
+        return output_texts_concat
 
     def save(self, predictions, reasons):
         eval_dir = os.path.join(self.config.eval.results_dir, f"step_{self.step}")
@@ -135,32 +132,21 @@ class UnitPropEvaluator:
 
     def evaluate(self):
         preds = self.get_preds()
-        correct = 0
-        begin_token_id = self.tokenizer.encode("begin", add_special_tokens=False)[0]
-        eos_token_id = self.tokenizer.eos_token_id
-        correct_tokens = []
+        reasons = []
         for pred in preds:
-            output =  pred[1].tolist()
-            start_pos = output.index(begin_token_id)
             try:
-                end_pos = output.index(eos_token_id)
+                reasons.append(parse_and_validate(pred))
             except:
-                end_pos = len(output)
-            end_pos_target = pred[0].index(eos_token_id)
-            output = output[start_pos+1:end_pos]
-            target = pred[0][:end_pos_target]
-            if output == target:
-                correct += 1
-            for i in range(len(target)):
-                correct_tokens.append(output[i] == target[i])
-        acc = correct / len(preds)
-        acc_tokens = sum(correct_tokens) / len(correct_tokens)
+                reasons.append("Evaluator failure.", {pred})
+        valid_results = reasons.count("valid")
 
-        #self.save(preds, reasons)
+        acc = valid_results / len(reasons)
+
+        self.save(preds, reasons)
         del self.hf_model
         torch.cuda.empty_cache()
 
-        return acc, acc_tokens
+        return acc
 
 
 def parse_and_validate(input_string):
