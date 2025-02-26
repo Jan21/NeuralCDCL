@@ -4,7 +4,7 @@ import torch
 from litgpt import LLM
 from litgpt.data import Alpaca2k
 import lightning as L
-from data.data_pythia import *
+from utils.data_pythia import *
 import hydra
 from config import hf_config
 from lightning.pytorch.loggers import WandbLogger
