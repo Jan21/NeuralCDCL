@@ -59,7 +59,7 @@ def log_clause(clause,i):
             string += f"+ x{abs(l)} "
         else:
             string += f"- x{abs(l)} "
-    return string.strip() + ' ) : c{i}'
+    return string.strip() + f' ) : c{i}'
 
 def log_clause_list(clause_list):
     string = ''
@@ -96,21 +96,20 @@ class CDCLSolver:
                 status, value = self.evaluate_clause(clause)
                 if status and not value:
                     self.trace.append(f"found conflict: c{i}") #{log_clause(clause,i)}") #TODO
-                    #self.trace.append('UP end')
+                    self.trace.append('UP end')
                     propagated = False
                     return clause
                 elif self.is_unit(clause):
                     self.trace.append(f'unit found: c{i}') # : {log_clause(clause)}') # TODO convert clause
                     #self.trace.append('UP end')
-                    propagated = False
-                    return clause
                     lit = self.get_unassigned_literal(clause)
                     var = abs(lit)
                     value = lit > 0
-                    #self.trace.append(f'variable assigned: x{var} = {value}') #TODO
+                    propagated = True
+                    #return clause
+                    self.trace.append(f'variable assigned: x{var} = {value}') #TODO
                     self.assign(var, value, clause)
                     
-
             if not propagated:
                 self.trace.append("nothing propagated")
                 break
