@@ -46,10 +46,26 @@ class LitLLM(L.LightningModule):
             json.dump(self.hf_conf, f, indent=2)
 
     def mask_targets(self, input_ids, target_ids):
-        first_search_pos = (input_ids == self.delimiter_token_id).cumsum(dim=1).bool()
+        # Find positions with delimiter tokens
+        delimiter_positions = (input_ids == self.delimiter_token_id)
+        
+        # Create a shifted version where positions after delimiter are marked
+        # This will include the delimiter itself as True
+        first_search_pos = torch.zeros_like(input_ids, dtype=torch.bool)
+        first_search_pos[:, 1:] = delimiter_positions.cumsum(dim=1)[:, :-1].bool()
+        
+        # Create the mask - True for delimiter and positions before it
         mask = ~first_search_pos.cumsum(dim=1).bool()
+        
         # Apply the mask to targets, setting masked positions to -100
         return torch.where(mask, torch.tensor(-100, device=target_ids.device), target_ids)
+
+
+    # def mask_targets(self, input_ids, target_ids):
+    #     first_search_pos = (input_ids == self.delimiter_token_id).cumsum(dim=1).bool()
+    #     mask = ~first_search_pos.cumsum(dim=1).bool()
+    #     # Apply the mask to targets, setting masked positions to -100
+    #     return torch.where(mask, torch.tensor(-100, device=target_ids.device), target_ids)
 
     def training_step(self, batch: torch.Tensor, batch_idx: int) -> torch.Tensor:
         idx, targets_no_mask, att_mask = (
@@ -176,7 +192,7 @@ def main(cfg: DictConfig):
                        delimiter_token_id=trace_start_token_id)
 
     logger = WandbLogger(
-        project="cdcl", name=f"clause-selection-{cfg.model.name}", config=wandb_config
+        project="cdcl", name=f"{cfg.model.name}", config=wandb_config
     )
 
     # checkpoint_callback = ModelCheckpoint(
