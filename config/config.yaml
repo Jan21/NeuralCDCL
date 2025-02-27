@@ -23,20 +23,21 @@ data:
   train_file: "cdcl_train.json"
   val_file: "cdcl_test.json"
   num_workers: 8
-  split_str: "iteration"
+  split_str: "begin"
+  
 model:
-  name: "Pythia-${model.n_layer}-${model.n_head}-${model.n_embd}-clause_select"
+  name: "Pythia-${model.n_layer}-${model.n_head}-${model.n_embd}-clause_select-new_data"
   batch_size: 128
   accumulate_grad_batches: 1
-  block_size: 512
+  block_size: 1024
   epochs: 100
-  n_layer: 6
-  n_head: 4
-  n_embd: 64
-  vocab_size: 70
-  padded_vocab_size: 70
-  bos_id: 60
-  eos_id: 64
+  n_layer: 12
+  n_head: 8
+  n_embd: 256
+  vocab_size: 110
+  padded_vocab_size: 110
+  bos_id: 104
+  eos_id: 108
 
 optim:
   lr: 1e-2

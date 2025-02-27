@@ -99,32 +99,31 @@ class LitLLM(L.LightningModule):
         self.log(f"loss", loss, on_epoch=True, sync_dist=True, prog_bar=True)
         return {f"loss": loss}
     
-    # def on_validation_epoch_end(self):
-    #     test = self.trainer.datamodule.dataset["test"]
+    def on_validation_epoch_end(self):
+        test = self.trainer.datamodule.dataset["test"]
 
-    #     save_path = self.cfg.convert_hf.in_path
-    #     self.llm.model.to(self.llm.preprocessor.device)
-    #     self.llm.save(save_path)
+        save_path = self.cfg.convert_hf.in_path
+        self.llm.model.to(self.llm.preprocessor.device)
+        self.llm.save(save_path)
 
-    #     self.llm.model.to(self.device)
+        self.llm.model.to(self.device)
 
-    #     evaluator = Evaluator(
-    #         self.cfg,
-    #         test,
-    #         self.preprocessor.tokenizer,
-    #         self.cfg.data.split_str,
-    #         self.global_step,
-    #         self.llm.model,
-    #     )
-    #     acc = evaluator.evaluate()
-    #     print(acc)
-    #     self.log(
-    #         "Evaluation/acc",
-    #         acc,
-    #         on_epoch=True,
-    #         prog_bar=True,
-    #         sync_dist=True,
-    #     )
+        evaluator = Evaluator(
+            self.cfg,
+            test,
+            self.preprocessor.tokenizer,
+            self.cfg.data.split_str,
+            self.global_step,
+            self.llm.model,
+        )
+        is_success = evaluator.evaluate()
+        # self.log(
+        #     "Evaluation/acc",
+        #     acc,
+        #     on_epoch=True,
+        #     prog_bar=True,
+        #     sync_dist=True,
+        # )
 
     def configure_optimizers(self):
         warmup_steps = 10
