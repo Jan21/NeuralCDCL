@@ -6,51 +6,6 @@ import json
 from tqdm import tqdm
 import os
 
-def log_clauses(clauses):
-    string = 'clauses: '
-    for c in clauses:
-        string += "( "
-        for l in c:
-            if l > 0:
-                string += f"+ {abs(l)} "
-            else:
-                string += f"- {abs(l)} "
-        string += ") "
-    string = string.strip()
-    return string
-
-def log_clauses(clauses):
-    
-    litdic = defaultdict(list)
-    clausedic = defaultdict(list)
-    for i,cl in enumerate(clauses):
-        for l in cl:
-            litdic[l].append(i+1)
-            clausedic[i+1].append(l)
-    
-    token_positions = []
-    
-    # Add litdic lists
-    for lit, clauses in litdic.items():
-        token_positions.append(clauses)
-        
-    # Add clausedic lists 
-    for clause_num, lits in clausedic.items():
-        token_positions.append(lits)
-    # Find maximum length of lists in result
-    max_length = max(len(lst) for lst in token_positions)
-    lit_dic_np = {}
-    for k,v in litdic.items():
-        padded_v = v + [0] * (max_length - len(v))
-        lit_dic_np[k] = np.array(padded_v)
-
-    clause_dic_np = {}
-    for k,v in clausedic.items():
-        padded_v = v + [0] * (max_length - len(v))
-        clause_dic_np[k] = np.array(padded_v)
-
-        
-    return (clause_dic_np, lit_dic_np)
 
 def log_clause(clause,i):
     string = f'( '
@@ -190,7 +145,7 @@ def generate_random_formula(n_vars, n_clauses=None, clause_length=3):
     return clauses
 
  ######## TEST
-num_vars = 7
+num_vars = 15
 formulas = []
 for i in tqdm(range(100000)):
     formulas.append(generate_random_formula(num_vars))
