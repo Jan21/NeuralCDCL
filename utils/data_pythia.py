@@ -65,6 +65,43 @@ class Datamodule(LightningDataModule):
         )
 
 
+def get_data_for_inference(cfg, datapaths, tokenizer):
+    tokenized_datasets = []
+    empty_dataset = Dataset.from_dict({"text": []})
+    
+    for test_path in datapaths:
+        hf_dataset = load_dataset(
+            "json",
+            data_files={
+                "test": test_path,
+            },
+        )
+        hf_dataset = DatasetDict({
+            "train": empty_dataset,
+            "val": empty_dataset,
+            "test": hf_dataset["test"]
+        })
+
+        # hf_dataset["test"] = hf_dataset["test"].select(range(int(10)))
+
+        def tokenize(examples):
+            texts = [
+                tokenizer.bos_token + " " + ex + " " + tokenizer.eos_token for ex in examples["text"]
+            ]
+            outputs = tokenizer(
+                texts,
+                truncation=True,
+                max_length=cfg.model.block_size,
+                padding='longest',
+                return_overflowing_tokens=False,
+            )
+            return {"input_ids": outputs["input_ids"]}
+
+        tokenized_datasets.append(hf_dataset.map(
+            tokenize, batched=True, remove_columns=hf_dataset["train"].column_names))
+
+    return tokenized_datasets
+
 def get_data(cfg: DictConfig, tokenizer):
     train_file = to_absolute_path(os.path.join(cfg.data.datapath, cfg.data.train_file))
     val_file = to_absolute_path(os.path.join(cfg.data.datapath, cfg.data.val_file))

@@ -30,7 +30,7 @@ model:
   batch_size: 128
   accumulate_grad_batches: 1
   block_size: 1024
-  epochs: 100
+  epochs: 200
   n_layer: 12
   n_head: 8
   n_embd: 256
@@ -50,3 +50,8 @@ eval:
 convert_hf:
   in_path: "temp/${model.name}"
   out_path: "temp/hf_${model.name}"
+
+inference:
+  modelpath: "./temp/hf_Pythia-12-8-256-clause_select-new_data"
+  datapath: ${data.datapath}/generalization/
+  batch_size: 256
