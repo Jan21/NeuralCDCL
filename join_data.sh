@@ -2,12 +2,12 @@
 #SBATCH --job-name=cdcl_data    # Job name
 #SBATCH --output=pythia_%j.out        # Standard output and error log (%j expands to jobID)
 #SBATCH --error=pythia_%j.err         # Error log
-#SBATCH --time=30:00:00              # Time limit hrs:min:sec
+#SBATCH --time=2:00:00              # Time limit hrs:min:sec
 #SBATCH --account=project_465001424
 #SBATCH --nodes=1                      # Number of nodes requested
 #SBATCH --ntasks=1                     # Number of tasks (processes)
 #SBATCH --gpus=1                      # Number of GPUs requested
-#SBATCH --cpus-per-task=16            # Number of CPU cores per task
+#SBATCH --cpus-per-task=4            # Number of CPU cores per task
 #SBATCH --mem=64GB                    # Memory limit
 #SBATCH --partition=small-g               # Partition name
 
@@ -17,4 +17,6 @@
 
 singularity exec \
     $SIF \
-    python train_pythia.py
+    python data_generation/join_data.py --exclude_combinations "7:4.2" "8:3.9" "13:3.6" "14:5.1" "20:5.4" \
+  --input_dir temp/train/ --output_file temp/cdcl_train.json \
+  --test_dir temp/test/ --test_output_file temp/cdcl_test.json --combine_test

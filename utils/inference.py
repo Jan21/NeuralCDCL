@@ -193,7 +193,7 @@ def main(cfg: DictConfig):
     hf_model.cuda()
     hf_model.eval()
     # get hf model's tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(model_dir, local_files_only=True)
+    tokenizer = get_tokenizer(cfg.tok_data)
 
     # load the data from a directory
     datapaths = glob.glob(f"{cfg.inference.datapath}/*.json")
@@ -266,7 +266,9 @@ def main(cfg: DictConfig):
             tokenizer.padding_side = "left"
             inputs = tokenizer(batch_text, return_tensors="pt", padding=True).to("cuda")
             input_prompt = inputs["input_ids"]
-            
+            # print(inputs["attention_mask"])
+            # print(inputs["attention_mask"].shape)
+            # print(inputs["attention_mask"][0])
             with torch.no_grad():
                 outputs = hf_model.generate(
                     input_ids=input_prompt,
@@ -282,8 +284,12 @@ def main(cfg: DictConfig):
             batch_outputs = outputs.tolist()
             for j, output_ids in enumerate(batch_outputs):
                 # Find the search token in the output
-                split_index = output_ids.index(search_token_id)
-                end_index = output_ids.index(end_token_id)
+                try:
+                    split_index = output_ids.index(search_token_id)
+                    end_index = output_ids.index(end_token_id)
+                except:
+                    print(f"Unable to find {end_token_id} or {search_token_id}. Skipping example...")
+                    continue
                 # Extract everything after the search token
                 generated_ids = output_ids[split_index+1:end_index+1]
                 generated_text = tokenizer.decode(generated_ids, skip_special_tokens=False)
@@ -293,9 +299,9 @@ def main(cfg: DictConfig):
         # Add predictions to the results dictionary
         results_dict[current_path]['predictions_text'] = predictions_text
         results_dict[current_path]['predictions_ids'] = predictions_ids
-        print("GT", solutions_text, "\n", "PRED", predictions_text)
-        print("\n")
-        print("GT", solutions_ids, "PRED", predictions_ids)
+        # print("GT", solutions_text, "\n\n", "PRED", predictions_text)
+        # print("\n\n")
+        # print("GT", solutions_ids, "\n\n", "PRED", predictions_ids)
 
     # After processing all datasets and adding predictions to results_dict:
     output_dir = Path("./temp/generalization_results")

@@ -71,6 +71,7 @@ class Evaluator:
             try:
                 split_index = input_ids.index(search_token_id)
             except:
+                print("ERROR")
                 print(input_ids)
                 print(sample)
                 print(self.tokenizer.decode(input_ids, skip_special_tokens=True))

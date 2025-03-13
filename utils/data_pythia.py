@@ -82,23 +82,37 @@ def get_data_for_inference(cfg, datapaths, tokenizer):
             "test": hf_dataset["test"]
         })
 
-        # hf_dataset["test"] = hf_dataset["test"].select(range(int(10)))
+        # hf_dataset["test"] = hf_dataset["test"].select(range(int(1024)))
 
         def tokenize(examples):
             texts = [
                 tokenizer.bos_token + " " + ex + " " + tokenizer.eos_token for ex in examples["text"]
             ]
-            outputs = tokenizer(
-                texts,
-                truncation=True,
-                max_length=cfg.model.block_size,
-                padding='longest',
-                return_overflowing_tokens=False,
-            )
-            return {"input_ids": outputs["input_ids"]}
+            try:
+                outputs = tokenizer(
+                    texts,
+                    truncation=True,
+                    max_length=cfg.model.block_size,
+                    padding='longest',
+                    return_overflowing_tokens=False,
+                )
+                return {"input_ids": outputs["input_ids"]}
+            except Exception as e:
+                # Print the failing examples
+                for i, text in enumerate(texts):
+                    try:
+                        tokenizer(text, truncation=True, max_length=cfg.model.block_size)
+                    except Exception as inner_e:
+                        print(f"Tokenization failed for example {i}")
+                        print(f"Text preview: {examples['text'][i][:100]}...")
+                        print(f"Error: {str(inner_e)}")
+                raise e
 
-        tokenized_datasets.append(hf_dataset.map(
-            tokenize, batched=True, remove_columns=hf_dataset["train"].column_names))
+        try:
+            tokenized_datasets.append(hf_dataset.map(
+                tokenize, batched=True, remove_columns=hf_dataset["train"].column_names))
+        except Exception:
+            print(f"Tokenization failed for dataset: {test_path}")
 
     return tokenized_datasets
 
@@ -116,7 +130,7 @@ def get_data(cfg: DictConfig, tokenizer):
         },
     )
 
-    # hf_dataset["train"] = hf_dataset["train"].select(range(int(1000)))
+    hf_dataset["test"] = hf_dataset["test"].select(range(int(128)))
 
     def tokenize(examples):
         texts = [

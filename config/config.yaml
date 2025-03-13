@@ -10,8 +10,8 @@ hydra:
 
 data_preprocess:
   raw_data_path: "../data/solved_problems.pkl"
-  num_test: 512
-  num_val: 2048
+  num_test: 138
+  num_val: 138
 
 tok_data:
   train_file: "temp/cdcl_train.json"
@@ -22,29 +22,29 @@ data:
   datapath: temp
   train_file: "cdcl_train.json"
   val_file: "cdcl_test.json"
-  num_workers: 8
+  num_workers: 32
   split_str: "begin"
   
 model:
-  name: "Pythia-${model.n_layer}-${model.n_head}-${model.n_embd}-clause_select-new_data"
+  name: "Pythia-${model.n_layer}-${model.n_head}-${model.n_embd}-clause_select-split_vars-gen"
   batch_size: 128
   accumulate_grad_batches: 1
-  block_size: 1024
+  block_size: 2048
   epochs: 200
   n_layer: 12
   n_head: 8
   n_embd: 256
-  vocab_size: 110
-  padded_vocab_size: 110
-  bos_id: 104
-  eos_id: 108
+  vocab_size: 44
+  padded_vocab_size: 44
+  bos_id: 38
+  eos_id: 42
 
 optim:
   lr: 1e-2
 
 eval:
   num_examples: ${data_preprocess.num_test}
-  batch_size: 128
+  batch_size: 138
   results_dir: "data/eval_results/${model.name}"
 
 convert_hf:
@@ -52,6 +52,6 @@ convert_hf:
   out_path: "temp/hf_${model.name}"
 
 inference:
-  modelpath: "./temp/hf_Pythia-12-8-256-clause_select-new_data"
+  modelpath: "./temp/hf_Pythia-12-8-256-clause_select-split_vars-gen"
   datapath: ${data.datapath}/generalization/
-  batch_size: 256
+  batch_size: 128
