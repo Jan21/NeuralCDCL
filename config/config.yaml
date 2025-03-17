@@ -10,39 +10,34 @@ hydra:
 
 general:
   project: "SAT"
-  run_name: "Pythia-6-8-512-dfs (Training on hard)"
-  devices: [1]
+  run_name: "Pythia-6-8-512-dfs"
+  devices: [2]
 
 tok_data:
-  train_file: "../data/cdcl_easy.json"
   tokenizer_path: "${model.tokenizer_path}/tokenizer.json"
 
 data:
+  packed: False
   datapath: data
-  train_file_easy: "cdcl_easy_train.json"
-  val_file_easy: "cdcl_easy_val.json"
-  train_file_medium: "cdcl_medium_train.json"
-  val_file_medium: "cdcl_medium_val.json"
-  train_file_hard: "cdcl_hard_train.json"
-  val_file_hard: "cdcl_hard_val.json"
-  train_data: "hard"
+  train_file: "../data/cdcl_dataset_3-6_100k.json"
+  test_file: "../data/cdcl_dataset_7-8_1k.json"
   num_train: 100000
-  num_eval: 1000
+  num_test: 1000
   num_workers: 64
 
 model:
   name: "Pythia-${model.n_layer}-${model.n_head}-${model.n_embd}-dfs"
   batch_size: 16
   accumulate_grad_batches: 4
-  block_size: 4096
+  block_size: 3000
   epochs: 40
   n_layer: 6
   n_head: 8
   n_embd: 512
-  vocab_size: 56
-  padded_vocab_size: 56
-  bos_id: 52
-  eos_id: 55
+  vocab_size: 76
+  padded_vocab_size: 76
+  bos_id: 72
+  eos_id: 75
   checkpoint_dir: "model/${dl_model.full_path}"
   tokenizer_path: "model/${dl_model.full_path}"
 
@@ -59,9 +54,9 @@ eval:
   eval_interval: 10
   results_dir: "data/eval_results/${model.name}"
   log_step_frequency: 50
-  val_check_interval: 0.2
+  val_check_interval: 0.1
   callback_epoch_frequency: 1
-  callback_acc_data_count: 100
+  callback_acc_data_count: 25
 
 dl_model:
   model_folder: "checkpoints"
