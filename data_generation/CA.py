@@ -185,9 +185,9 @@ class CDCLSolver:
                 trace.append(f"queue: {log_queue(queue)}") # TODO
         
         # Create set of literals from current level variables with opposite polarity
-        current_level_lits = {-var if self.assignments[var] else var for var in current_level_vars}
+        current_level_lits = [-var if self.assignments[var] else var for var in current_level_vars]
         trace.append(f"current-level-lits: {log_queue(current_level_lits)}")
-        new_clause =list(learned_lits.union(current_level_lits)) # TODO check if this is correct'
+        new_clause =list(learned_lits.union(set(current_level_lits))) # TODO check if this is correct'
         trace.append(f"new-clause: {log_new_clause(new_clause)}")
         trace.append("AC-end")
         self.trace.append(trace)
@@ -312,7 +312,7 @@ for i in tqdm(range(100000)):
 
 
 traces =  []
-for clauses in formulas:
+for clauses in tqdm(formulas):
     g = Glucose3()
     for clause in clauses:
         g.add_clause(clause)
@@ -339,15 +339,35 @@ for clauses in formulas:
         assert is_valid
         g_verify.delete()
 
-# Save traces to a pickle file
-import pickle
-import os
+trace_strs = []
+for trace in traces:
+    trace_str = " ; ".join(trace)
+    trace_strs.append(trace_str)
 
-# Create directory if it doesn't exist
-os.makedirs('data', exist_ok=True)
+trace_strs[0]
 
-# Save the traces to a pickle file
-with open('data/traces.pkl', 'wb') as f:
-    pickle.dump(traces, f)
 
-print(f"Saved {len(traces)} traces to data/traces.pkl")
+num_traces = len(trace_strs)
+split_idx = int(0.9 * num_traces)
+
+train_traces = trace_strs[:split_idx]
+test_traces = trace_strs[split_idx:]
+
+print(f"Split {num_traces} traces into {len(train_traces)} training and {len(test_traces)} testing traces")
+
+# Save the splits to files
+import json
+
+# Convert traces to the required format (dict with "text" key)
+train_data = [{"text": trace} for trace in train_traces]
+test_data = [{"text": trace} for trace in test_traces]
+
+# Save to JSON files
+with open('train_CA.json', 'w') as f:
+    json.dump(train_data, f)
+
+with open('test_CA.json', 'w') as f:
+    json.dump(test_data, f)
+
+print(f"Saved training traces to train_traces.json")
+print(f"Saved testing traces to test_traces.json")
