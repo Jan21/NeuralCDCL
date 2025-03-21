@@ -151,6 +151,7 @@ for i in tqdm(range(100000)):
     formulas.append(generate_random_formula(num_vars))
 
 traces =  []
+counts = []
 
 for clauses in formulas:
     solver = CDCLSolver(clauses)
@@ -164,11 +165,12 @@ for clauses in formulas:
         solver.assignments[var] = value
     solver.unit_propagate()
     traces.append(" ; ".join(solver.trace))
+    counts.append(len(traces[-1].split(" ")))
 
 train_size = int(0.8 * len(traces))
 train_traces = traces[:train_size]
 test_traces = traces[train_size:]
-
+print(max(counts))
 # Create dictionaries with 'text' key
 train_data = [{"text": trace} for trace in train_traces]
 test_data = [{"text": trace} for trace in test_traces]
