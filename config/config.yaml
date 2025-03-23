@@ -10,8 +10,8 @@ hydra:
 
 data_preprocess:
   raw_data_path: "../data/solved_problems.pkl"
-  num_test: 138
-  num_val: 138
+  num_test: 128
+  num_val: 128
 
 tok_data:
   train_file: "temp/cdcl_train.json"
@@ -26,7 +26,7 @@ data:
   split_str: "begin"
   
 model:
-  name: "Pythia-${model.n_layer}-${model.n_head}-${model.n_embd}-clause_select-split_vars-gen"
+  name: "Pythia-${model.n_layer}-${model.n_head}-${model.n_embd}-clause_select-split_vars-99-500k"
   batch_size: 128
   accumulate_grad_batches: 1
   block_size: 2048
@@ -44,7 +44,7 @@ optim:
 
 eval:
   num_examples: ${data_preprocess.num_test}
-  batch_size: 138
+  batch_size: 128
   results_dir: "data/eval_results/${model.name}"
 
 convert_hf:
@@ -52,6 +52,6 @@ convert_hf:
   out_path: "temp/hf_${model.name}"
 
 inference:
-  modelpath: "./temp/hf_Pythia-12-8-256-clause_select-split_vars-gen"
+  modelpath: "./temp/hf_Pythia-12-8-256-clause_select-split_vars-99-500k"
   datapath: ${data.datapath}/generalization/
   batch_size: 128

@@ -55,6 +55,10 @@ def calculate_metrics(results_dict, tokenizer):
             for j in range(min_len):
                 if gt_ids[j] == pred_ids[j]:
                     matches += 1
+                else:
+                    print(f"Not matching: \n GT: \n {gt_ids} \n PRED: \n {pred_ids}")
+                    print(f"Decoded: \n GT: \n {tokenizer.decode(gt_ids, skip_special_tokens=True)} \n PRED: \n {tokenizer.decode(pred_ids, skip_special_tokens=True)}")
+
             token_acc = matches / max(len(gt_ids), len(pred_ids)) if max(len(gt_ids), len(pred_ids)) > 0 else 1.0
             
             # Calculate exact match
@@ -288,7 +292,7 @@ def main(cfg: DictConfig):
                     split_index = output_ids.index(search_token_id)
                     end_index = output_ids.index(end_token_id)
                 except:
-                    print(f"Unable to find {end_token_id} or {search_token_id}. Skipping example...")
+                    print(f"Unable to find {end_token_id} or {search_token_id}. Skipping example in {current_path}...")
                     continue
                 # Extract everything after the search token
                 generated_ids = output_ids[split_index+1:end_index+1]

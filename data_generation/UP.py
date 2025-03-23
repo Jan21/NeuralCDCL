@@ -1,57 +1,8 @@
-from pysat.solvers import Glucose3
 import random
-from collections import defaultdict
-import numpy as np
 import json
-from tqdm import tqdm
 import os
 import argparse
-
-# def log_clauses(clauses):
-#     string = 'clauses: '
-#     for c in clauses:
-#         string += "( "
-#         for l in c:
-#             if l > 0:
-#                 string += f"+ {abs(l)} "
-#             else:
-#                 string += f"- {abs(l)} "
-#         string += ") "
-#     string = string.strip()
-#     return string
-
-# def log_clauses(clauses):
-    
-#     litdic = defaultdict(list)
-#     clausedic = defaultdict(list)
-#     for i,cl in enumerate(clauses):
-#         for l in cl:
-#             litdic[l].append(i+1)
-#             clausedic[i+1].append(l)
-    
-#     token_positions = []
-    
-#     # Add litdic lists
-#     for lit, clauses in litdic.items():
-#         token_positions.append(clauses)
-        
-#     # Add clausedic lists 
-#     for clause_num, lits in clausedic.items():
-#         token_positions.append(lits)
-#     # Find maximum length of lists in result
-#     max_length = max(len(lst) for lst in token_positions)
-#     lit_dic_np = {}
-#     for k,v in litdic.items():
-#         padded_v = v + [0] * (max_length - len(v))
-#         lit_dic_np[k] = np.array(padded_v)
-
-#     clause_dic_np = {}
-#     for k,v in clausedic.items():
-#         padded_v = v + [0] * (max_length - len(v))
-#         clause_dic_np[k] = np.array(padded_v)
-
-        
-#     return (clause_dic_np, lit_dic_np)
+from tqdm import tqdm
 
 def log_clause(clause, i):
     string = f'( '
@@ -104,21 +55,19 @@ class CDCLSolver:
                 status, value = self.evaluate_clause(clause)
                 if status and not value:
                     i_str = ' '.join(digit for digit in str(i))
-                    self.trace.append(f"found conflict: c {i_str}") #{log_clause(clause,i)}") #TODO
+                    self.trace.append(f"found conflict: c {i_str}")
                     self.trace.append('UP end')
                     propagated = False
                     return clause
                 elif self.is_unit(clause):
                     i_str = ' '.join(digit for digit in str(i))
-                    self.trace.append(f'unit found: c {i_str}') # : {log_clause(clause)}') # TODO convert clause
-                    #self.trace.append('UP end')
+                    self.trace.append(f'unit found: c {i_str}')
                     lit = self.get_unassigned_literal(clause)
                     var = abs(lit)
                     value = lit > 0
                     propagated = True
-                    #return clause
                     var_str = ' '.join(digit for digit in str(var))
-                    self.trace.append(f'variable assigned: x {var_str} = {value}') #TODO
+                    self.trace.append(f'variable assigned: x {var_str} = {value}')
                     self.assign(var, value, clause)
                     
             if not propagated:
@@ -126,7 +75,6 @@ class CDCLSolver:
                 break
         self.trace.append("UP end")
         return None
-
 
     def assign(self, var, value, reason):
         self.assignments[var] = value
@@ -166,105 +114,146 @@ class CDCLSolver:
                 return lit
         return None
 
-
-def generate_random_formula(n_vars, coefficient=4.2, clause_length=3):
+def generate_random_formula(n_vars, allowed_vars, coefficient=4.2, clause_length=3):
     """
-    Generate a random SAT formula with n variables.
-    Args:
-        n_vars: Number of variables
-        n_clauses: Number of clauses (default: around 4.2 * n_vars for balanced SAT/UNSAT)
-        coefficient: Coefficient for determining number of clauses (default: 4.2)
-        clause_length: Length of each clause (default: 3 for 3-SAT)
-    Returns:
-        List of clauses, where each clause is a list of integers
+    Generate a random SAT formula using only variables from allowed_vars.
     """
-    # Use empirically determined ratio for balanced SAT/UNSAT
-    n_clauses = int(coefficient * n_vars)
-        
+    n_clauses = int(coefficient * len(allowed_vars))
+    
+    # Convert allowed_vars to a list for random sampling
+    vars_list = list(allowed_vars)
+    
     clauses = []
+    
     for _ in range(n_clauses):
         # Generate a clause with random literals
         clause = []
-        vars_used = set()
+        clause_vars = set()
         
         while len(clause) < clause_length:
-            # Pick a random variable that hasn't been used in this clause
-            var = random.randint(1, n_vars)
-            if var not in vars_used:
+            # If we've used all available variables for this clause, break
+            if len(clause_vars) >= len(vars_list):
+                break
+                
+            # Pick a random variable from allowed variables that hasn't been used in this clause
+            var = random.choice(vars_list)
+            if var not in clause_vars:
                 # Randomly choose positive or negative literal
                 lit = var if random.random() < 0.5 else -var
                 clause.append(lit)
-                vars_used.add(var)
+                clause_vars.add(var)
                 
-        clauses.append(clause)
+        if clause:  # Only add non-empty clauses
+            clauses.append(clause)
         
     return clauses
 
-parser = argparse.ArgumentParser(description='Generate and test random SAT formulas')
-parser.add_argument('--coefficient', type=float, default=4.2,
-                    help='Coefficient for determining number of clauses (default: 4.2)')
-parser.add_argument('--num_vars', type=int, default=7,
-                    help='Number of variables in the formulas (default: 7)')
-args = parser.parse_args()
+def main():
+    parser = argparse.ArgumentParser(description='Generate and test random SAT formulas')
+    parser.add_argument('--coefficient', type=float, default=4.2,
+                        help='Coefficient for determining number of clauses (default: 4.2)')
+    parser.add_argument('--num_vars', type=int, default=99,
+                        help='Maximum variable number to consider (default: 99)')
+    args = parser.parse_args()
 
-coefficient = args.coefficient
-
- ######## TEST
-num_vars = args.num_vars
-formulas = []
-for i in tqdm(range(12228)):
-    formulas.append(generate_random_formula(num_vars, coefficient))
-
-traces =  []
-
-for clauses in tqdm(formulas):
-    solver = CDCLSolver(clauses)
-    # Sample random integer n from 3 to 5
+    coefficient = args.coefficient
+    max_var = args.num_vars
     
-    n = random.randint(2, num_vars-1)
-    # Choose n random variables and assign random boolean values
-    vars_to_assign = random.sample(range(1, num_vars+1), n)  # Choose n random variables from 1-10
-    for var in vars_to_assign:
-        value = random.choice([True, False])
-        solver.assignments[var] = value
-    solver.unit_propagate()
-    traces.append(" ; ".join(solver.trace))
-
-# train_size = int(0.9 * len(traces))
-# train_traces = traces[:train_size]
-# test_traces = traces[train_size:]
-
-# for generalization:
-train_size = 12100
-train_traces = traces[:train_size]
-test_traces = traces[train_size:train_size+128]
-
-# Create dictionaries with 'text' key
-train_data = [{"text": trace} for trace in train_traces]
-test_data = [{"text": trace} for trace in test_traces]
-
-# Save to JSON files
-if not os.path.exists("temp"):
-    os.makedirs("temp")
-if not os.path.exists("temp/train"):
-    os.makedirs("temp/train")
-    os.makedirs("temp/test")
-if not os.path.exists("temp/generalization"):
-    os.makedirs("temp/generalization")
-
-# Update the filenames to include parameters
-train_filename = f"temp/train/cdcl_train_vars{num_vars}_coef_{coefficient}.json"
-test_filename = f"temp/test/cdcl_test_vars{num_vars}_coef_{coefficient}.json"
-generalization_test_filename = f"temp/generalization/cdcl_test_vars{num_vars}_coef_{coefficient}.json"
-# Use these filenames instead of the original one
-
-with open(train_filename, "w") as f:
-    json.dump(train_data, f, indent=2)
+    # Define reserved variables for test set (variables where both digits are the same)
+    reserved_test_vars = []
+    for i in range(1, 10):  # For variables 11, 22, ..., 99
+        double_digit = i * 10 + i
+        if double_digit <= max_var:
+            reserved_test_vars.append(double_digit)
     
-with open(test_filename, "w") as f:
-    json.dump(test_data, f, indent=2)
+    # Define available variables for training (all multi-digit variables except reserved test vars)
+    train_vars = [i for i in range(10, max_var + 1) if i not in reserved_test_vars]  # Start from 10 to exclude single digits
+    
+    print(f"Reserved test-only variables: {reserved_test_vars}")
+    print(f"Available training variables: {len(train_vars)} variables")
+    
+    # Generate train and test formulas
+    train_size = 500000
+    test_size = 500
+    total_size = train_size + test_size
+    
+    formulas = []
+    
+    print("Generating formulas...")
+    # Generate training formulas (no test-only variables)
+    for i in tqdm(range(total_size)):
+        if i < train_size:
+            # For training: use only train_vars
+            num_vars_to_use = min(random.randint(5, 20), len(train_vars))
+            vars_for_formula = set(random.sample(train_vars, num_vars_to_use))
+        else:
+            # For testing: use any variables (both train and test vars)
+            num_vars_to_use = min(random.randint(5, 9), len(reserved_test_vars))
+            vars_for_formula = set(random.sample(reserved_test_vars, num_vars_to_use))
+        
+        formula = generate_random_formula(num_vars_to_use, vars_for_formula, coefficient)
+        formulas.append(formula)
+    
+    print("Processing formulas to generate traces...")
+    # Process all formulas to create traces
+    traces = []
+    for clauses in tqdm(formulas):
+        solver = CDCLSolver(clauses)
+        
+        # Determine which variables are available for assignment
+        used_vars = set()
+        for clause in clauses:
+            for lit in clause:
+                used_vars.add(abs(lit))
+        
+        if len(used_vars) > 1:
+            # Sample random integer n from 2 to the number of variables used
+            n = random.randint(2, min(len(used_vars), len(used_vars) - 1))
+            
+            # Choose n random variables from used_vars
+            vars_to_assign = random.sample(list(used_vars), n)
+            
+            for var in vars_to_assign:
+                value = random.choice([True, False])
+                solver.assignments[var] = value
+        
+        solver.unit_propagate()
+        traces.append(" ; ".join(solver.trace))
+    
+    # Split into train and test sets
+    train_traces = traces[:train_size]
+    test_traces = traces[train_size:train_size+test_size]
+    
+    # Create dictionaries with 'text' key
+    train_data = [{"text": trace} for trace in train_traces]
+    test_data = [{"text": trace} for trace in test_traces]
+    
+    # Save to JSON files
+    if not os.path.exists("temp"):
+        os.makedirs("temp")
+    if not os.path.exists("temp/train"):
+        os.makedirs("temp/train")
+        os.makedirs("temp/test")
+    if not os.path.exists("temp/generalization"):
+        os.makedirs("temp/generalization")
+    
+    train_filename = f"temp/train/cdcl_train_vars{max_var}_coef_{coefficient}.json"
+    test_filename = f"temp/test/cdcl_test_vars{max_var}_coef_{coefficient}.json"
+    generalization_test_filename = f"temp/generalization/cdcl_test_vars{max_var}_coef_{coefficient}.json"
+    
+    with open(train_filename, "w") as f:
+        json.dump(train_data, f, indent=2)
+        
+    with open(test_filename, "w") as f:
+        json.dump(test_data, f, indent=2)
+    
+    with open(generalization_test_filename, "w") as f:
+        json.dump(test_data, f, indent=2)
+    
+    print(f"\nFiles saved successfully:")
+    print(f"  Training data: {train_filename}")
+    print(f"  Test data: {test_filename}")
+    print(f"  Generalization test data: {generalization_test_filename}")
 
-with open(generalization_test_filename, "w") as f:
-    json.dump(test_data, f, indent=2)
-
-
+if __name__ == "__main__":
+    main()

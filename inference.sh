@@ -2,7 +2,7 @@
 #SBATCH --job-name=cdcl_data    # Job name
 #SBATCH --output=logs/pythia_%j.out        # Standard output and error log (%j expands to jobID)
 #SBATCH --error=logs/pythia_%j.err         # Error log
-#SBATCH --time=48:00:00              # Time limit hrs:min:sec
+#SBATCH --time=10:00:00              # Time limit hrs:min:sec
 #SBATCH --account=project_465001424
 #SBATCH --nodes=1                      # Number of nodes requested
 #SBATCH --ntasks=1                     # Number of tasks (processes)

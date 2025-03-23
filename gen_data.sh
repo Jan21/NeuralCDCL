@@ -19,85 +19,84 @@
 #     $SIF \
 #     python data_generation/UP.py
 
-singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 17
-singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 6
-singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 9
-singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 10
-singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 11
-singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 15
-singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 16
-singularity exec $SIF python data_generation/UP.py --coefficient 4.5 --num_vars 17
-singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 18
-singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 19
-singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 20
-singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 21
+# singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 17
+# singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 6
+# singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 9
+# singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 10
+# singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 11
+singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 99
+# singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 16
+# singularity exec $SIF python data_generation/UP.py --coefficient 4.5 --num_vars 17
+# singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 18
+# singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 19
+# singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 20
+# singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 21
 
 # # Coefficient 3.0
-# singularity exec $SIF python data_generation/UP.py --coefficient 3.0 --num_vars 7
-# singularity exec $SIF python data_generation/UP.py --coefficient 3.0 --num_vars 8
-# singularity exec $SIF python data_generation/UP.py --coefficient 3.0 --num_vars 12
-# singularity exec $SIF python data_generation/UP.py --coefficient 3.0 --num_vars 13
-# singularity exec $SIF python data_generation/UP.py --coefficient 3.0 --num_vars 14
+# singularity exec $SIF python data_generation/UP.py --coefficient 3.0 --num_vars 7 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 3.0 --num_vars 8 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 3.0 --num_vars 12 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 3.0 --num_vars 13 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 3.0 --num_vars 14 --num_formulas 12228 --seed 42
 
 # # Coefficient 3.3
-# singularity exec $SIF python data_generation/UP.py --coefficient 3.3 --num_vars 7
-# singularity exec $SIF python data_generation/UP.py --coefficient 3.3 --num_vars 8
-# singularity exec $SIF python data_generation/UP.py --coefficient 3.3 --num_vars 12
-# singularity exec $SIF python data_generation/UP.py --coefficient 3.3 --num_vars 13
-# singularity exec $SIF python data_generation/UP.py --coefficient 3.3 --num_vars 14
+# singularity exec $SIF python data_generation/UP.py --coefficient 3.3 --num_vars 7 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 3.3 --num_vars 8 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 3.3 --num_vars 12 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 3.3 --num_vars 13 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 3.3 --num_vars 14 --num_formulas 12228 --seed 42
 
 # # Coefficient 3.6
-# singularity exec $SIF python data_generation/UP.py --coefficient 3.6 --num_vars 7
-# singularity exec $SIF python data_generation/UP.py --coefficient 3.6 --num_vars 8
-# singularity exec $SIF python data_generation/UP.py --coefficient 3.6 --num_vars 12
-# singularity exec $SIF python data_generation/UP.py --coefficient 3.6 --num_vars 13
-# singularity exec $SIF python data_generation/UP.py --coefficient 3.6 --num_vars 14
+# singularity exec $SIF python data_generation/UP.py --coefficient 3.6 --num_vars 7 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 3.6 --num_vars 8 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 3.6 --num_vars 12 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 3.6 --num_vars 13 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 3.6 --num_vars 14 --num_formulas 12228 --seed 42
 
 # # Coefficient 3.9
-# singularity exec $SIF python data_generation/UP.py --coefficient 3.9 --num_vars 7
-# singularity exec $SIF python data_generation/UP.py --coefficient 3.9 --num_vars 8
-# singularity exec $SIF python data_generation/UP.py --coefficient 3.9 --num_vars 12
-# singularity exec $SIF python data_generation/UP.py --coefficient 3.9 --num_vars 13
-# singularity exec $SIF python data_generation/UP.py --coefficient 3.9 --num_vars 14
+# singularity exec $SIF python data_generation/UP.py --coefficient 3.9 --num_vars 7 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 3.9 --num_vars 8 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 3.9 --num_vars 12 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 3.9 --num_vars 13 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 3.9 --num_vars 14 --num_formulas 12228 --seed 42
 
 # # Coefficient 4.2 (default)
-# singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 7
-# singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 8
-# singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 12
-# singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 13
-# singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 14
-# singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 15
-# singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 20
-# singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 24
-
+# singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 7 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 8 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 12 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 13 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 14 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 15 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 20 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 4.2 --num_vars 24 --num_formulas 12228 --seed 42
 
 # # Coefficient 4.5
-# singularity exec $SIF python data_generation/UP.py --coefficient 4.5 --num_vars 7
-# singularity exec $SIF python data_generation/UP.py --coefficient 4.5 --num_vars 8
-# singularity exec $SIF python data_generation/UP.py --coefficient 4.5 --num_vars 12
-# singularity exec $SIF python data_generation/UP.py --coefficient 4.5 --num_vars 13
-# singularity exec $SIF python data_generation/UP.py --coefficient 4.5 --num_vars 14
+# singularity exec $SIF python data_generation/UP.py --coefficient 4.5 --num_vars 7 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 4.5 --num_vars 8 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 4.5 --num_vars 12 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 4.5 --num_vars 13 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 4.5 --num_vars 14 --num_formulas 12228 --seed 42
 
 # # Coefficient 4.8
-# singularity exec $SIF python data_generation/UP.py --coefficient 4.8 --num_vars 7
-# singularity exec $SIF python data_generation/UP.py --coefficient 4.8 --num_vars 8
-# singularity exec $SIF python data_generation/UP.py --coefficient 4.8 --num_vars 12
-# singularity exec $SIF python data_generation/UP.py --coefficient 4.8 --num_vars 13
-# singularity exec $SIF python data_generation/UP.py --coefficient 4.8 --num_vars 14
+# singularity exec $SIF python data_generation/UP.py --coefficient 4.8 --num_vars 7 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 4.8 --num_vars 8 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 4.8 --num_vars 12 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 4.8 --num_vars 13 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 4.8 --num_vars 14 --num_formulas 12228 --seed 42
 
 # # Coefficient 5.1
-# singularity exec $SIF python data_generation/UP.py --coefficient 5.1 --num_vars 7
-# singularity exec $SIF python data_generation/UP.py --coefficient 5.1 --num_vars 8
-# singularity exec $SIF python data_generation/UP.py --coefficient 5.1 --num_vars 12
-# singularity exec $SIF python data_generation/UP.py --coefficient 5.1 --num_vars 13
-# singularity exec $SIF python data_generation/UP.py --coefficient 5.1 --num_vars 14
-# singularity exec $SIF python data_generation/UP.py --coefficient 5.1 --num_vars 20
+# singularity exec $SIF python data_generation/UP.py --coefficient 5.1 --num_vars 7 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 5.1 --num_vars 8 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 5.1 --num_vars 12 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 5.1 --num_vars 13 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 5.1 --num_vars 14 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 5.1 --num_vars 20 --num_formulas 12228 --seed 42
 
 # # Coefficient 5.4
-# singularity exec $SIF python data_generation/UP.py --coefficient 5.4 --num_vars 7
-# singularity exec $SIF python data_generation/UP.py --coefficient 5.4 --num_vars 8
-# singularity exec $SIF python data_generation/UP.py --coefficient 5.4 --num_vars 12
-# singularity exec $SIF python data_generation/UP.py --coefficient 5.4 --num_vars 13
-# singularity exec $SIF python data_generation/UP.py --coefficient 5.4 --num_vars 14
-# singularity exec $SIF python data_generation/UP.py --coefficient 5.4 --num_vars 20
-# singularity exec $SIF python data_generation/UP.py --coefficient 5.4 --num_vars 24
+# singularity exec $SIF python data_generation/UP.py --coefficient 5.4 --num_vars 7 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 5.4 --num_vars 8 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 5.4 --num_vars 12 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 5.4 --num_vars 13 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 5.4 --num_vars 14 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 5.4 --num_vars 20 --num_formulas 12228 --seed 42
+# singularity exec $SIF python data_generation/UP.py --coefficient 5.4 --num_vars 24 --num_formulas 12228 --seed 42
