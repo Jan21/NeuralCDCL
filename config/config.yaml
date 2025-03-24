@@ -55,4 +55,4 @@ convert_hf:
 inference:
   modelpath: "./temp/hf_Pythia-${model.n_layer}-${model.n_head}-${model.n_embd}-conflict-analysis"
   datapath: ${data.datapath}/generalization/
-  batch_size: 128
+  batch_size: 256

@@ -82,7 +82,7 @@ def get_data_for_inference(cfg, datapaths, tokenizer):
             "test": hf_dataset["test"]
         })
 
-        # hf_dataset["test"] = hf_dataset["test"].select(range(int(1024)))
+        hf_dataset["test"] = hf_dataset["test"].select(range(int(1024)))
 
         def tokenize(examples):
             texts = [
