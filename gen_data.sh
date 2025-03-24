@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=cdcl_data    # Job name
-#SBATCH --output=pythia_%j.out        # Standard output and error log (%j expands to jobID)
-#SBATCH --error=pythia_%j.err         # Error log
+#SBATCH --job-name=data    # Job name
+#SBATCH --output=logs/data_gen/pythia_%j.out        # Standard output and error log (%j expands to jobID)
+#SBATCH --error=logs/data_gen/pythia_%j.err         # Error log
 #SBATCH --time=2:00:00              # Time limit hrs:min:sec
 #SBATCH --account=project_465001424
 #SBATCH --nodes=1                      # Number of nodes requested
@@ -17,4 +17,4 @@
 
 singularity exec \
     $SIF \
-    python data_generation/UP.py
+    python data_generation/CA.py

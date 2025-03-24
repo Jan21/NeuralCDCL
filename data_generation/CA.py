@@ -348,7 +348,7 @@ trace_strs[0]
 
 
 num_traces = len(trace_strs)
-split_idx = int(0.9 * num_traces)
+split_idx = int(0.90 * num_traces)
 
 train_traces = trace_strs[:split_idx]
 test_traces = trace_strs[split_idx:]
@@ -363,10 +363,10 @@ train_data = [{"text": trace} for trace in train_traces]
 test_data = [{"text": trace} for trace in test_traces]
 
 # Save to JSON files
-with open('train_CA.json', 'w') as f:
+with open('./temp/train_CA.json', 'w') as f:
     json.dump(train_data, f)
 
-with open('test_CA.json', 'w') as f:
+with open('./temp/test_CA.json', 'w') as f:
     json.dump(test_data, f)
 
 print(f"Saved training traces to train_traces.json")

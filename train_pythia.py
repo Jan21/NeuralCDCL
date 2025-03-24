@@ -88,43 +88,52 @@ class LitLLM(L.LightningModule):
         )
         targets = self.mask_targets(idx, targets)
         out, loss = self(idx, targets)
+        
         # Compute accuracy only on non-masked tokens
         predictions = torch.argmax(out, dim=-1)
-        correct = (predictions[:, :-1] == targets[:, 1:]) * (targets[:, 1:] != -100)  # Only count non-masked tokens
+        
+        # Create mask for non-masked tokens in the shifted targets
+        valid_mask = (targets[:, 1:] != -100)
+        
+        # Compare predictions with targets only on non-masked positions
+        correct = (predictions[:, :-1] == targets[:, 1:]) * valid_mask
+        
+        # Count total correct predictions and total valid tokens
         total_correct = correct.sum()
-        total_tokens = (targets != -100).sum()
-        accuracy = total_correct.float() / total_tokens
+        total_tokens = valid_mask.sum()
+        
+        # Calculate accuracy (avoid division by zero)
+        accuracy = total_correct.float() / total_tokens if total_tokens > 0 else torch.tensor(0.0)
 
         self.log(f"acc", accuracy, on_epoch=True, sync_dist=True, prog_bar=True)
         self.log(f"loss", loss, on_epoch=True, sync_dist=True, prog_bar=True)
         return {f"loss": loss}
     
-    # def on_validation_epoch_end(self):
-    #     test = self.trainer.datamodule.dataset["test"]
+    def on_validation_epoch_end(self):
+        test = self.trainer.datamodule.dataset["test"]
 
-    #     save_path = self.cfg.convert_hf.in_path
-    #     self.llm.model.to(self.llm.preprocessor.device)
-    #     self.llm.save(save_path)
+        save_path = self.cfg.convert_hf.in_path
+        self.llm.model.to(self.llm.preprocessor.device)
+        self.llm.save(save_path)
 
-    #     self.llm.model.to(self.device)
+        self.llm.model.to(self.device)
 
-    #     evaluator = Evaluator(
-    #         self.cfg,
-    #         test,
-    #         self.preprocessor.tokenizer,
-    #         self.cfg.data.split_str,
-    #         self.global_step,
-    #         self.llm.model,
-    #     )
-    #     acc = evaluator.evaluate()
-    #     print(acc)
-    #     self.log(
-    #         "Evaluation/acc",
-    #         acc,
-    #         on_epoch=True,
-    #         prog_bar=True,
-    #         sync_dist=True,
-    #     )
+        evaluator = Evaluator(
+            self.cfg,
+            test,
+            self.preprocessor.tokenizer,
+            self.cfg.data.split_str,
+            self.global_step,
+            self.llm.model,
+        )
+        is_success = evaluator.evaluate()
+        # self.log(
+        #     "Evaluation/acc",
+        #     acc,
+        #     on_epoch=True,
+        #     prog_bar=True,
+        #     sync_dist=True,
+        # )
 
     def configure_optimizers(self):
         warmup_steps = 10
@@ -192,7 +201,7 @@ def main(cfg: DictConfig):
                        delimiter_token_id=trace_start_token_id)
 
     logger = WandbLogger(
-        project="cdcl", name=f"{cfg.model.name}", config=wandb_config
+        project="cdcl-CA", name=f"{cfg.model.name}", config=wandb_config
     )
 
     # checkpoint_callback = ModelCheckpoint(

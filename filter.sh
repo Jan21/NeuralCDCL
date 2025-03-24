@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=tokenizer_cdcl_ca    # Job name
-#SBATCH --output=logs/tokenizer/pythia_%j.out        # Standard output and error log (%j expands to jobID)
-#SBATCH --error=logs/tokenizer/pythia_%j.err         # Error log
+#SBATCH --job-name=filter_cdcl-ca    # Job name
+#SBATCH --output=logs/filter/pythia_%j.out        # Standard output and error log (%j expands to jobID)
+#SBATCH --error=logs/filter/pythia_%j.err         # Error log
 #SBATCH --time=2:00:00              # Time limit hrs:min:sec
 #SBATCH --account=project_465001424
 #SBATCH --nodes=1                      # Number of nodes requested
@@ -17,4 +17,4 @@
 
 singularity exec \
     $SIF \
-    python tokenizer/create_tokenizer.py
+    python utils/filter_data.py

@@ -59,29 +59,38 @@ class Evaluator:
         self.split_str = split_str
         os.makedirs(self.results_dir, exist_ok=True)
 
-        self.prompts = self.get_prompts()
+        self.prompts, self.gts = self.get_prompts()
 
     def get_prompts(self):
         search_token_id = self.tokenizer.encode(self.split_str, add_special_tokens=False)[0]
 
+        gts = []
         prompts = []
         for sample in self.test_set:
             input_ids = sample["input_ids"]
-            split_index = input_ids.index(search_token_id)
+            try:
+                split_index = input_ids.index(search_token_id)
+            except:
+                print("ERROR")
+                print(input_ids)
+                print(sample)
+                print(self.tokenizer.decode(input_ids, skip_special_tokens=True))
             # Take everything up to Search: token
             prompt_ids = input_ids[: split_index + 1]
 
             # Decode to text, add BOS token at start
             prompt_text = self.tokenizer.decode(prompt_ids, skip_special_tokens=True)
             full_prompt = self.tokenizer.bos_token + " " + prompt_text
+            gt = self.tokenizer.decode(input_ids, skip_special_tokens=True)
 
             # Re-encode with BOS token
             prompt_with_bos = self.tokenizer.encode(
                 full_prompt, add_special_tokens=False
             )
             prompts.append(prompt_with_bos)
+            gts.append(gt)
 
-        return prompts
+        return prompts, gts
 
     def get_preds(self):
         batch_size = self.batch_size
@@ -132,81 +141,81 @@ class Evaluator:
 
     def evaluate(self):
         preds = self.get_preds()
-        reasons = []
-        for pred in preds:
-            try:
-                reasons.append(parse_and_validate(pred))
-            except:
-                reasons.append("Evaluator failure.", {pred})
-        valid_results = reasons.count("valid")
+        # reasons = []
+        # for pred in preds:
+        #     try:
+        #         reasons.append(parse_and_validate(pred))
+        #     except:
+        #         reasons.append("Evaluator failure.", {pred})
+        # valid_results = reasons.count("valid")
 
-        acc = valid_results / len(reasons)
+        # acc = valid_results / len(reasons)
 
-        self.save(preds, reasons)
+        self.save(preds, self.gts)
         del self.hf_model
         torch.cuda.empty_cache()
 
-        return acc
+        return True
 
 
-def parse_and_validate(input_string):
-    import re
+# def parse_and_validate(input_string):
+#     import re
 
-    # Crop the input string at the first occurrence of 'END'
-    end_index = input_string.find("END")
-    if end_index != -1:
-        input_string = input_string[:end_index]
+#     # Crop the input string at the first occurrence of 'END'
+#     end_index = input_string.find("END")
+#     if end_index != -1:
+#         input_string = input_string[:end_index]
 
-    # Helper function to convert bracketed content to a dictionary
-    def parse_dict(data_str):
-        entries = data_str.strip("[]").split(",")
-        result_dict = {}
-        for entry in entries:
-            parts = entry.split(":")
-            if len(parts) == 2:
-                try:
-                    key, value = int(parts[0].strip()), int(parts[1].strip())
-                    result_dict[key] = value
-                except ValueError:
-                    continue  # Ignore malformed entries
-        return result_dict
+#     # Helper function to convert bracketed content to a dictionary
+#     def parse_dict(data_str):
+#         entries = data_str.strip("[]").split(",")
+#         result_dict = {}
+#         for entry in entries:
+#             parts = entry.split(":")
+#             if len(parts) == 2:
+#                 try:
+#                     key, value = int(parts[0].strip()), int(parts[1].strip())
+#                     result_dict[key] = value
+#                 except ValueError:
+#                     continue  # Ignore malformed entries
+#         return result_dict
 
-    # Extract Goal
-    goal_match = re.search(r"Goal: \[(.*?)\]", input_string)
-    if goal_match:
-        goal = parse_dict(goal_match.group(1))
-    else:
-        return "Invalid input - Goal not found."
+#     # Extract Goal
+#     goal_match = re.search(r"Goal: \[(.*?)\]", input_string)
+#     if goal_match:
+#         goal = parse_dict(goal_match.group(1))
+#     else:
+#         return "Invalid input - Goal not found."
 
-    # Find the last occurrence of 'CS' and the immediately following 'CG'
-    cs_matches = list(re.finditer(r"CS: \[(.*?)\]", input_string))
-    cg_matches = list(re.finditer(r"CG: \[(.*?)\]", input_string))
+#     # Find the last occurrence of 'CS' and the immediately following 'CG'
+#     cs_matches = list(re.finditer(r"CS: \[(.*?)\]", input_string))
+#     cg_matches = list(re.finditer(r"CG: \[(.*?)\]", input_string))
 
-    if not cs_matches:
-        return "Invalid input - CS not found."
-    if not cg_matches:
-        return "Invalid input - CG not found."
+#     if not cs_matches:
+#         return "Invalid input - CS not found."
+#     if not cg_matches:
+#         return "Invalid input - CG not found."
 
-    # Get the last occurrences
-    last_cs = cs_matches[-1]
-    # Find the next CG after the last CS
-    for match in cg_matches:
-        if match.start() > last_cs.start():
-            last_cg = match
-            break
-    else:
-        return "Invalid input - CG not properly placed after last CS."
+#     # Get the last occurrences
+#     last_cs = cs_matches[-1]
+#     # Find the next CG after the last CS
+#     for match in cg_matches:
+#         if match.start() > last_cs.start():
+#             last_cg = match
+#             break
+#     else:
+#         return "Invalid input - CG not properly placed after last CS."
 
-    # Parse the last CS and CG
-    current_state = parse_dict(last_cs.group(1))
-    change_goal = parse_dict(last_cg.group(1))
+#     # Parse the last CS and CG
+#     current_state = parse_dict(last_cs.group(1))
+#     change_goal = parse_dict(last_cg.group(1))
 
-    # Update current state based on change goal
-    for index, value in change_goal.items():
-        if index in current_state:
-            current_state[index] = value
+#     # Update current state based on change goal
+#     for index, value in change_goal.items():
+#         if index in current_state:
+#             current_state[index] = value
 
-    # Compare updated current state with the goal
-    is_valid = current_state == goal
+#     # Compare updated current state with the goal
+#     is_valid = current_state == goal
 
-    return "valid" if is_valid else "invalid"
+#     return "valid" if is_valid else "invalid"
