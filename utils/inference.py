@@ -127,7 +127,7 @@ def main(cfg: DictConfig):
         test_set = data.test_dataset
 
         search_token_id = tokenizer.encode(cfg.data.split_str, add_special_tokens=False)[0]
-        end_token_id = tokenizer.encode("AC-end", add_special_tokens=False)[0]
+        end_token_id = tokenizer.encode("solve-end", add_special_tokens=False)[0]
 
         # Initialize lists for this dataset
         solutions_text = []

@@ -14,31 +14,31 @@ data_preprocess:
   num_val: 2048
 
 tok_data:
-  train_file: "temp/train_CA.json"
-  val_file: "temp/test_CA.json"
-  test_file: "temp/test_CA.json"
+  train_file: "data/train_solve.json"
+  val_file: "data/test_solve.json"
+  test_file: "data/test_solve.json"
   tokenizer_path: "tokenizer/tokenizer.json"
 
 data:
-  datapath: temp
-  train_file: "train_CA.json"
-  val_file: "test_CA.json"
+  datapath: data
+  train_file: "train_solve.json"
+  val_file: "test_solve.json"
   num_workers: 32
-  split_str: "AC-begin"
+  split_str: "solve-begin"
 
 model:
-  name: "Pythia-${model.n_layer}-${model.n_head}-${model.n_embd}-conflict-analysis"
+  name: "Pythia-${model.n_layer}-${model.n_head}-${model.n_embd}-solve"
   batch_size: 128
   accumulate_grad_batches: 1
   block_size: 2048
-  epochs: 100
+  epochs: 500
   n_layer: 12
   n_head: 4
   n_embd: 64
-  vocab_size: 144
-  padded_vocab_size: 144
-  bos_id: 139
-  eos_id: 143
+  vocab_size: 146
+  padded_vocab_size: 146
+  bos_id: 141
+  eos_id: 145
 
 optim:
   lr: 1e-2
@@ -53,6 +53,6 @@ convert_hf:
   out_path: "temp/hf_${model.name}"
 
 inference:
-  modelpath: "./temp/hf_Pythia-${model.n_layer}-${model.n_head}-${model.n_embd}-conflict-analysis"
+  modelpath: "./temp/hf_Pythia-${model.n_layer}-${model.n_head}-${model.n_embd}-solve"
   datapath: ${data.datapath}/generalization/
   batch_size: 256
