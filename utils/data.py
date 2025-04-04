@@ -88,23 +88,14 @@ def weighted_random_choice(traces):
 def preprocess_dataset(dataset, packed):
     """
     Expands each input datapoint into a fixed number of training examples before `.map()` is applied.
-    Selects only one sample from `unit_prop_traces` and `analyze_conflict_traces` with weighted probability.
+    Instead of selecting one weighted sample, it now includes all `unit_prop_traces` and `analyze_conflict_traces`.
     """
     all_data = []
     for example in dataset:
         expanded_examples = []
         
         if packed:
-            # Select one random sample from each trace list with increasing probability
-            unit_prop_sample = weighted_random_choice(example["unit_prop_traces"])
-            analyze_conflict_sample = weighted_random_choice(example["analyze_conflict_traces"])
-            
-            # Construct the list including SOLVE + one sampled UP + one sampled AC
-            all_texts = [example["solve_trace_packed"]]
-            if unit_prop_sample:
-                all_texts.append(unit_prop_sample)
-            if analyze_conflict_sample:
-                all_texts.append(analyze_conflict_sample)
+            all_texts = [example["solve_trace_packed"]] + example["unit_prop_traces"] + example["analyze_conflict_traces"]
         else:
             all_texts = [example["solve_trace_unpacked"]]
 
@@ -113,7 +104,6 @@ def preprocess_dataset(dataset, packed):
         all_data.extend(expanded_examples)
 
     return Dataset.from_list(all_data)
-
 
 def get_data(cfg: DictConfig, tokenizer):
     hf_dataset = load_dataset(
@@ -124,8 +114,8 @@ def get_data(cfg: DictConfig, tokenizer):
         },
     )
 
-    hf_dataset["train"] = preprocess_dataset(hf_dataset["train"].select(range(cfg.data.num_train)), cfg.data.packed)
-    hf_dataset["test"] = preprocess_dataset(hf_dataset["test"].select(range(cfg.data.num_test)), cfg.data.packed)
+    hf_dataset["train"] = hf_dataset["train"].select(range(cfg.data.num_train))
+    hf_dataset["test"] = hf_dataset["test"].select(range(cfg.data.num_test))
 
     # Split the train set into train and validation
     split_dataset = hf_dataset["train"].train_test_split(train_size=0.9, seed=42)  # 90% train, 10% val
@@ -134,6 +124,10 @@ def get_data(cfg: DictConfig, tokenizer):
         "val": split_dataset["test"],
         "test": hf_dataset["test"],  # Keep test separate
     })
+
+    hf_dataset["train"] = preprocess_dataset(hf_dataset["train"], cfg.data.packed)
+    hf_dataset["val"] = preprocess_dataset(hf_dataset["val"], True)
+    hf_dataset["test"] = preprocess_dataset(hf_dataset["test"], True)
 
     # Tokenize all splits without padding to compute actual token lengths
     def tokenize_unpadded(element):

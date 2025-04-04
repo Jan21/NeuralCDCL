@@ -35,8 +35,6 @@ class TrainingCallback(Callback):
 
             if self.control_tokens["solve_tokens"]["arguments"] in input_ids and len(solve_samples) < self.acc_sample_size:
                 solve_samples.append(input_ids)
-                print(self.tokenizer.decode(input_ids, skip_special_tokens=True)[-30:])
-                print()
             elif self.control_tokens["up_tokens"]["arguments"] in input_ids and len(up_samples) < self.acc_sample_size:
                 up_samples.append(input_ids)
             elif self.control_tokens["ac_tokens"]["arguments"] in input_ids and len(ac_samples) < self.acc_sample_size:
@@ -44,7 +42,6 @@ class TrainingCallback(Callback):
 
             if len(solve_samples) == self.acc_sample_size and len(up_samples) == self.acc_sample_size and len(ac_samples) == self.acc_sample_size:
                 break  # Stop once we have enough samples
-        print('XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx')
 
         return solve_samples, up_samples, ac_samples
 
@@ -76,8 +73,6 @@ class TrainingCallback(Callback):
 
     def compute_accuracy(self, pred_lst, trace_gt_lst, module):
         """Computes accuracy based on module type."""
-        if module == 'solve':
-            print(pred_lst, trace_gt_lst)
         correct = sum(1 for pred, gt in zip(pred_lst, trace_gt_lst) if pred == gt)
         return correct / len(trace_gt_lst) if trace_gt_lst else 0
 
@@ -111,7 +106,7 @@ class TrainingCallback(Callback):
         up_preds = [x[0].tolist() + [eos_token] for x in up_preds_raw]
         ac_preds = [x[0].tolist() + [eos_token] for x in ac_preds_raw]
 
-        return solve_preds, up_preds, ac_preds, solve_gt, up_gt, ac_gt
+        return solve_preds, up_preds, ac_preds, solve_gt, up_gt, ac_gt, solve_samples, up_samples, ac_samples
 
     def on_train_epoch_end(self, trainer, model):
         """Logs accuracy and example text at specified frequency."""
@@ -120,9 +115,8 @@ class TrainingCallback(Callback):
             for dataloader_idx, val_dataloader in enumerate(val_dataloaders):
                 dataset = val_dataloader.dataset
                 dataset_name = self.val_dataset_names[dataloader_idx]
-                print(dataset_name)
 
-                solve_preds, up_preds, ac_preds,solve_gt, up_gt, ac_gt = self.generate_predictions(dataset, model)
+                solve_preds, up_preds, ac_preds,solve_gt, up_gt, ac_gt, solve_samples, up_samples, ac_samples = self.generate_predictions(dataset, model)
 
                 # **Extract pred traces for accuracy**
                 _, solve_pred_part = self.process_samples(solve_preds, "solve")
@@ -132,10 +126,13 @@ class TrainingCallback(Callback):
                 # **Compute Accuracy**
                 module_accuracies = self.compute_accuracy_from_predictions(solve_pred_part, up_pred_part, ac_pred_part, solve_gt, up_gt, ac_gt)
 
-                # **Select and Decode Random Samples**
-                random_solve = self.tokenizer.decode(random.choice(solve_preds), skip_special_tokens=True)
-                random_up = self.tokenizer.decode(random.choice(up_preds), skip_special_tokens=True) if len(up_preds) else ""
-                random_ac = self.tokenizer.decode(random.choice(ac_preds), skip_special_tokens=True) if len(ac_preds) else ""
+                sample_pred_solve = self.tokenizer.decode(solve_preds[0], skip_special_tokens=True)
+                sample_pred_up = self.tokenizer.decode(up_preds[0], skip_special_tokens=True)
+                sample_pred_ac = self.tokenizer.decode(ac_preds[0], skip_special_tokens=True)
+
+                sample_gt_solve = self.tokenizer.decode(solve_samples[0], skip_special_tokens=True)
+                sample_gt_up = self.tokenizer.decode(up_samples[0], skip_special_tokens=True)
+                sample_gt_ac = self.tokenizer.decode(ac_samples[0], skip_special_tokens=True)
 
                 # **Log to WandB**
                 if trainer.logger and isinstance(trainer.logger, WandbLogger):
@@ -144,17 +141,26 @@ class TrainingCallback(Callback):
                         f"{dataset_name}/accuracy_analyze_conflict": module_accuracies["ANALYZE_CONFLICT"],
                         f"{dataset_name}/accuracy_unit_propagation": module_accuracies["UNIT_PROPAGATION"],
                         f"{dataset_name}/accuracy_solve": module_accuracies["SOLVE"],
-                        f"{dataset_name}/sample_solve": wandb.Html(f"<p>{random_solve}</p>"),
-                        f"{dataset_name}/sample_up": wandb.Html(f"<p>{random_up}</p>"),
-                        f"{dataset_name}/sample_ac": wandb.Html(f"<p>{random_ac}</p>"),
+                        f"{dataset_name}/sample_solve": wandb.Html(
+                            f"<b>Prediction:</b> <p>{sample_pred_solve}</p><br><b>Ground Truth:</b> <p>{sample_gt_solve}</p>"
+                        ),
+                        f"{dataset_name}/sample_unit_propagation": wandb.Html(
+                            f"<b>Prediction:</b> <p>{sample_pred_up}</p><br><b>Ground Truth:</b> <p>{sample_gt_up}</p>"
+                        ),
+                        f"{dataset_name}/sample_analyze_conflict": wandb.Html(
+                            f"<b>Prediction:</b> <p>{sample_pred_ac}</p><br><b>Ground Truth:</b> <p>{sample_gt_ac}</p>"
+                        ),
                     })
 
                 print(
                     f"[Epoch {trainer.current_epoch}] Dataset: {dataset_name} "
                     f"AC Acc: {module_accuracies['ANALYZE_CONFLICT']:.3f} | "
                     f"UP Acc: {module_accuracies['UNIT_PROPAGATION']:.3f} | "
-                    f"Solve Acc: {module_accuracies['SOLVE']:.3f}\n"
-                    f"Sample Solve: {random_solve}\n"
-                    f"Sample UP: {random_up}\n"
-                    f"Sample AC: {random_ac}\n"
+                    f"Solve Acc: {module_accuracies['SOLVE']:.3f}\n\n"
+                    # f"Sample Pred Solve: {sample_pred_solve}\n"
+                    f"Sample Pred UP: {sample_pred_up}\n"
+                    f"Sample Pred AC: {sample_pred_ac}\n\n"
+                    # f"Sample GT Solve: {sample_gt_solve}\n"
+                    f"Sample GT UP: {sample_gt_up}\n"
+                    f"Sample GT AC: {sample_pred_ac}\n"
                 )

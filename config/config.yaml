@@ -10,27 +10,27 @@ hydra:
 
 general:
   project: "SAT"
-  run_name: "Pythia-6-8-512-dfs"
-  devices: [2]
+  run_name: "Pythia-6-8-512-dfs_packed_50k"
+  devices: [0]
 
 tok_data:
   tokenizer_path: "${model.tokenizer_path}/tokenizer.json"
 
 data:
-  packed: False
+  packed: True
   datapath: data
   train_file: "../data/cdcl_dataset_3-6_100k.json"
   test_file: "../data/cdcl_dataset_7-8_1k.json"
-  num_train: 100000
+  num_train: 50000
   num_test: 1000
   num_workers: 64
 
 model:
-  name: "Pythia-${model.n_layer}-${model.n_head}-${model.n_embd}-dfs"
-  batch_size: 16
-  accumulate_grad_batches: 4
-  block_size: 3000
-  epochs: 40
+  name: "Pythia-${model.n_layer}-${model.n_head}-${model.n_embd}-dfs-packed_50k"
+  batch_size: 32
+  accumulate_grad_batches: 2
+  block_size: 2000
+  epochs: 5
   n_layer: 6
   n_head: 8
   n_embd: 512
@@ -42,7 +42,7 @@ model:
   tokenizer_path: "model/${dl_model.full_path}"
 
 optimizer:
-  warmup_steps: 1000
+  warmup_steps: 500
   lr: 1e-4
   weight_decay: 0.01
   betas: [0.9, 0.999]
@@ -50,13 +50,13 @@ optimizer:
 eval:
   config_path: "${model.checkpoint_dir}/model_config.json"
   num_examples: 128
-  batch_size: 64
+  batch_size: 32
   eval_interval: 10
   results_dir: "data/eval_results/${model.name}"
   log_step_frequency: 50
   val_check_interval: 0.1
   callback_epoch_frequency: 1
-  callback_acc_data_count: 25
+  callback_acc_data_count: 200
 
 dl_model:
   model_folder: "checkpoints"

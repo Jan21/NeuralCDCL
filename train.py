@@ -22,7 +22,7 @@ import wandb
 
 
 class LitLLM(L.LightningModule):
-    def __init__(self, cfg, model, tokenizer, preprocessor, val_dataset_names, control_tokens, trainer_ckpt_path=None):
+    def __init__(self, cfg, model, tokenizer, preprocessor, val_dataset_names, control_tokens, num_train, trainer_ckpt_path=None):
         super().__init__()
         self.llm = model
         self.cfg = cfg
@@ -31,6 +31,7 @@ class LitLLM(L.LightningModule):
         self.val_dataset_names = val_dataset_names
         self.trainer_ckpt_path = trainer_ckpt_path
         self.control_tokens = control_tokens
+        self.num_train = num_train
         _, self.hf_conf = hf_config.get_configs(cfg)
 
     def setup(self, stage):
@@ -119,7 +120,7 @@ class LitLLM(L.LightningModule):
                 return (step + 1) / self.cfg.optimizer.warmup_steps  # Warm-up phase
             else:
                 # After warm-up, we apply linear decay
-                total_steps = (self.cfg.data.num_train / (self.cfg.model.batch_size * self.cfg.model.accumulate_grad_batches)) * self.cfg.model.epochs
+                total_steps = (self.num_train / (self.cfg.model.batch_size * self.cfg.model.accumulate_grad_batches)) * self.cfg.model.epochs
                 decay_steps = step - self.cfg.optimizer.warmup_steps
                 return max(0.0, (total_steps - decay_steps) / total_steps)  # Linear decay
 
@@ -179,7 +180,8 @@ class LitLLM(L.LightningModule):
         self.eval()
         generated_sequences = []
 
-        for input_ids in inputs:
+        from tqdm import tqdm
+        for input_ids in tqdm(inputs, 'Generating pred'):
             current_input = torch.tensor(input_ids, device=self.device).unsqueeze(0)  # (1, seq_len)
             generated = current_input
             saved_context = None  # To store original context before modifying
@@ -225,7 +227,7 @@ class LitLLM(L.LightningModule):
 
                 # Generate continuation with new context
                 generated = new_context
-                while True:
+                while generated.size(1) < max_length:
                     with torch.no_grad():
                         logits = self(generated)[:, -1, :]
                     logits = logits / temperature
@@ -297,10 +299,11 @@ def main(cfg: DictConfig):
     val_dataset_names = ['val', 'test']
     model = LLM(GPT(conf), preprocessor=preprocessor, config=conf)
 
-    lit_model = LitLLM(model=model, tokenizer=tokenizer, cfg=cfg, preprocessor=preprocessor, val_dataset_names=val_dataset_names,
-                       control_tokens=control_tokens)
     datasets = get_data(cfg, tokenizer)
     data = Datamodule(datasets, batch_size, num_workers, tokenizer)
+    num_train = len(datasets["train"])
+    lit_model = LitLLM(model=model, tokenizer=tokenizer, cfg=cfg, preprocessor=preprocessor, val_dataset_names=val_dataset_names,
+                       control_tokens=control_tokens, num_train=num_train)
 
     data.connect(max_seq_length=cfg.model.block_size)
 

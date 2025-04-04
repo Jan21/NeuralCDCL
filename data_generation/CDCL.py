@@ -19,32 +19,30 @@ class CDCLSolver:
     def solve(self):
         self.tracer.on_start(self.clauses)
         while True:
-            self.tracer.on_solve_loop_start(self.assignments, self.decision_level, self.reason_clauses, self.level)
+            self.tracer.on_solve_loop_start()
             conflict = self.unit_propagate()
             if conflict:
                 if self.level == 0:
-                    self.tracer.on_solve_conflict_found(
-                        self.assignments, self.decision_level, self.reason_clauses, conflict, self.level, True
-                    )
+                    self.tracer.on_solve_conflict_found(self.level, True)
                     return False
+                self.tracer.on_solve_conflict_found(self.level, False)
                 learned_clause = self.analyze_conflict(conflict)
                 backtrack_level = self.find_backtrack_level(learned_clause)
+                self.tracer.on_solve_conflict_resolved()
                 self.backtrack(backtrack_level)
                 self.learned_clauses.append(learned_clause)
-                self.tracer.on_solve_conflict_found(
-                    self.assignments, self.decision_level, self.reason_clauses, conflict, self.level, False, learned_clause, backtrack_level
-                )
             else:
                 n_vars, n_assigned_vars = self.count_variables(), len(self.assignments)
                 if n_assigned_vars == n_vars:
-                    self.tracer.on_solve_conflict_not_found(n_vars, n_assigned_vars, True)
+                    self.tracer.on_solve_conflict_not_found(self.assignments, n_vars, n_assigned_vars, True)
                     return True
                 var = self.pick_branching_variable()
-                if var is None:
-                    return True
+                value = random.choice([True, False])
+                lit = var if value else -var
+                # self.assign(var, True, None)
+                self.tracer.on_solve_conflict_not_found(self.assignments, n_vars, n_assigned_vars, False, lit)
                 self.level += 1
-                self.assign(var, True, None)
-                self.tracer.on_solve_conflict_not_found(n_vars, n_assigned_vars, False, var)
+                self.assign(var, value, None)
 
     def unit_propagate(self,):
         self.tracer.on_unit_propagation_start(self.clauses, self.learned_clauses, self.assignments)
@@ -54,7 +52,8 @@ class CDCLSolver:
                 status, value = self.evaluate_clause(clause)  # status = all_assigned, value = satisfied
                 if status and not value:
                     self.tracer.on_unit_propagation_clause_propagation_loop_end(clause, status, value, True)  # conflict
-                    self.tracer.on_unit_propagation_end(self.assignments)
+                    self.tracer.on_unit_propagation_loop_end(propagated)
+                    self.tracer.on_unit_propagation_end(clause)
                     return clause
                 elif self.is_unit(clause):
                     lit = self.get_unassigned_literal(clause)
@@ -66,7 +65,7 @@ class CDCLSolver:
             self.tracer.on_unit_propagation_loop_end(propagated)
             if not propagated:
                 break
-        self.tracer.on_unit_propagation_end(self.assignments)
+        self.tracer.on_unit_propagation_end(None)
         return None
 
     def analyze_conflict(self, conflict_clause):
@@ -94,7 +93,7 @@ class CDCLSolver:
             
             # UIP condition: only one variable from current decision level remains
             if len(current_level_vars) <= 1:
-                self.tracer.on_analyze_conflict_iteration_end(queue, current_level_vars, learned_lits, True)
+                self.tracer.on_analyze_conflict_iteration_end(queue, current_level_vars - {var}, learned_lits, True)
                 break
                 
             # Get most recently assigned variable from current level
@@ -103,9 +102,7 @@ class CDCLSolver:
             
             # Get the clause that caused this variable's assignment
             reason = self.reason_clauses.get(var)
-            self.tracer.on_analyze_conflict_iteration_end(
-                queue, current_level_vars | {var}, learned_lits, False, var, current_level_vars, reason
-            )
+            self.tracer.on_analyze_conflict_iteration_end(queue, current_level_vars, learned_lits, False, var, reason)
             if reason:
                 queue = [lit for lit in self.get_literals_from_clause(reason) 
                         if abs(lit) != var]
@@ -113,7 +110,7 @@ class CDCLSolver:
         # Create set of literals from current level variables with opposite polarity
         current_level_lits = {-var if self.assignments[var] else var for var in current_level_vars}
         new_clause = list(learned_lits.union(current_level_lits)) # TODO check if this is correct'
-        self.tracer.on_analyze_conflict_end(current_level_lits)
+        self.tracer.on_analyze_conflict_end(new_clause)
         return new_clause
 
     def backtrack(self, level):
@@ -199,7 +196,7 @@ def main(args):
 
     formulas = []
     for _ in range(args.n_formulas):
-        formulas.append(generate_random_formula(n_vars=args.n_var))
+        formulas.append(generate_random_formula(n_vars=args.n_vars))
 
     for clauses in formulas:
         g = Glucose3()
@@ -208,7 +205,7 @@ def main(args):
         is_sat_pysat = g.solve()
         g.delete()
 
-        solver = CDCLSolver(clauses)
+        solver = CDCLSolver(clauses, Tracer())
         is_satisfiable = solver.solve()
         assert is_sat_pysat == is_satisfiable
 
@@ -226,7 +223,8 @@ def main(args):
             assert is_valid
 
     # print an example trace from CDCLSolver
-    print(solver.get_logs())
+    trace = solver.tracer.get_trace()
+    print('\n'.join(trace['solve_trace_with_subcalls']))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Test custom CDCL Solver with generated SAT formulas.")

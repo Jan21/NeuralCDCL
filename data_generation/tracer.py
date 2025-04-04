@@ -31,54 +31,43 @@ class Tracer:
         reason_clauses_adj = [reason_clauses[var] if var in reason_clauses else [] for var in assignments.keys()]
         assignments_lst = [var * (-1 if val < 1 else 1) for var, val in assignments.items()]
         trace = [
-            f"ANALYZE_CONFLICT_ARGUMENTS",
-            f"ASSIGNMENTS {format_list(assignments_lst, is_var=True)}",
-            f"DECISION_LEVELS {format_list(decision_level_adj, is_var=False)}",
-            f"REASON_CLAUSES {format_list(reason_clauses_adj, is_var=True)}",
-            f"CONFLICT_CLAUSE {format_list(conflict_clause, is_var=True)}",
-            f"LEVEL {level}",
-            f"ANALYZE_CONFLICT_START",
+            f"READ ASSIGNMENTS {format_list(assignments_lst, is_var=True)}",
+            f"READ DECISION_LEVELS {format_list(decision_level_adj, is_var=False)}",
+            f"READ REASON_CLAUSES {format_list(reason_clauses_adj, is_var=True)}",
+            f"READ CONFLICT_CLAUSE {format_list(conflict_clause, is_var=True)}",
+            f"READ LEVEL {level}\n",
         ]
-        trace = ' '.join(trace)
+        trace = '\n'.join(trace)
         self.current_analyze_trace.append(trace) 
-        self.solve_trace.append(trace)
 
-    def on_analyze_conflict_iteration_end(self, queue: list, curr_level_vars_pre: set, learned_lits: set, 
-                                          is_uip: bool, selected_var: Optional[int] = None, curr_level_vars_pos: Optional[set] = None, 
-                                          reason_clause: Optional[list] = None):
+    def on_analyze_conflict_iteration_end(self, queue: list, curr_level_vars: set, learned_lits: set, 
+                                          is_uip: bool, selected_var: Optional[int] = None, reason_clause: Optional[list] = None):
         trace = [
             f"QUEUE {format_list(queue, is_var=True)}",
-            f"CURRENT_LEVEL_VARS_PRE {format_list(list(curr_level_vars_pre), is_var=True)}",
-            f"LEARNED_LITERALS {format_list(list(learned_lits), is_var=True)}",
-            f"IS_UIP {str(int(is_uip))}",
+            f"RESOLVING {format_lit(selected_var) if selected_var is not None else 'None'}",
+            f"REASON_CLAUSE {format_list(reason_clause, is_var=True) if reason_clause is not None else 'None'}"
+            f"CURRENT_LVL_VARS {format_list(list(curr_level_vars), is_var=True)}",
+            f"LEARNED_LITS {format_list(list(learned_lits), is_var=True)}",
+            f"IS_UIP {str(int(is_uip))}\n",
         ]
-        if selected_var and curr_level_vars_pos and reason_clause:
-            trace = trace + [
-                f"SELECTED_VAR {format_lit(selected_var)}",
-                f"CURRENT_LEVEL_VARS_POS {format_list(list(curr_level_vars_pos), is_var=True)}",
-                f"REASON_CLAUSE {format_list(reason_clause, is_var=True)}"
-            ]
-        self.current_analyze_trace.append(' '.join(trace)) 
+        self.current_analyze_trace.append('\n'.join(trace)) 
 
-    def on_analyze_conflict_end(self, curr_level_lits: set):
+    def on_analyze_conflict_end(self, new_clause: list):
         trace = [
-            f"CURRENT_LEVEL_LITERALS {format_list(list(curr_level_lits), is_var=True)}",
+            f"WRITE NEW_CLAUSE {format_list(new_clause, is_var=True)}\n",
         ]
-        self.current_analyze_trace.append(' '.join(trace)) 
+        self.current_analyze_trace.append('\n'.join(trace)) 
 
     def on_analyze_conflict_find_backtrack_level_end(self, learned_clause: list, goto_level: int, levels: Optional[list] = None):
         trace = [
-            f"LEVELS {format_list(levels if levels else [], is_var=False)}",
-            f"ANALYZE_CONFLICT_RESULTS",
-            f"LEARNED_CLAUSE {format_list(learned_clause, is_var=True)}",
-            f"GOTO_LEVEL {goto_level}",
-            f"ANALYZE_CONFLICT_END"
+            f"DECISION_LEVELS {format_list(levels if levels else [], is_var=False)}",
+            f"WRITE BACKTRACK_LEVEL {goto_level}",
+            f"END"
         ]
-        self.current_analyze_trace.append(' '.join(trace)) 
+        self.current_analyze_trace.append('\n'.join(trace)) 
 
         self.analyze_conflict_traces.append(self.current_analyze_trace)
         self.current_analyze_trace = None
-        self.solve_trace.append(' '.join(trace[1:]))
 
 
     ### UNIT_PROPAGATION TRACES ###
@@ -87,14 +76,12 @@ class Tracer:
         clauses_combined = clauses + learned_clauses
         assignments_lst = [var * (-1 if val < 1 else 1) for var, val in assignments.items()]
         trace = [
-            f"UNIT_PROPAGATION_ARGUMENTS",
-            f"CLAUSES {format_list(clauses_combined, is_var=True)}",
-            f"ASSIGNMENTS {format_list(assignments_lst, is_var=True)}",
-            f"UNIT_PROPAGATION_START"
+            f"READ CLAUSES {format_list(clauses, is_var=True)}",
+            f"READ LEARNED_CLAUSES {format_list(learned_clauses, is_var=True)}",
+            f"READ ASSIGNMENTS {format_list(assignments_lst, is_var=True)}\n",
         ]
-        trace = ' '.join(trace)
+        trace = '\n'.join(trace)
         self.current_unit_trace.append(trace) 
-        self.solve_trace.append(trace)
 
     def on_unit_propagation_clause_propagation_loop_end(self, clause: list, all_assigned: bool, satisfied: bool,
                                                         conflict: bool, is_unit: Optional[bool] = None, 
@@ -104,91 +91,79 @@ class Tracer:
             f"ALL_ASSIGNED {str(int(all_assigned))}",
             f"SATISFIED {str(int(satisfied))}",
             f"CONFLICT {str(int(conflict))}",
+            f"IS_UNIT {str(int(is_unit)) if is_unit is not None else 'None'}",
         ]
-        if is_unit and learned_literal:
+        if learned_literal is not None:
             trace = trace + [
-                f"IS_UNIT {str(int(is_unit))}",
-                f"LEARNED_LITERAL {format_lit(learned_literal)}",
+                f"WRITE LIT {format_lit(learned_literal)} REASON {format_list(clause, is_var=True)}\n",
             ]
-        self.current_unit_trace.append(' '.join(trace)) 
+        self.current_unit_trace.append('\n'.join(trace)) 
 
     def on_unit_propagation_loop_end(self, propagated: bool):
         trace = [
             f"PROPAGATED {str(int(propagated))}",
         ]
-        self.current_unit_trace.append(' '.join(trace)) 
+        self.current_unit_trace.append('\n'.join(trace)) 
 
-    def on_unit_propagation_end(self, assignments: dict):
-        assignments_lst = [var * (-1 if val < 1 else 1) for var, val in assignments.items()]
-        trace = [
-            f"UNIT_PROPAGATION_RESULTS",
-            f"ASSIGNMENTS {format_list(assignments_lst, is_var=True)}",
-            f"UNIT_PROPAGATION_END"
-        ]
-        trace = ' '.join(trace)
+    def on_unit_propagation_end(self, conflict_clause: Optional[list]):
+        trace = []
+        if conflict_clause is not None:
+            trace = [f"WRITE CONFLICT_CLAUSE {format_list(conflict_clause, is_var=True)}"]
+        trace = trace + [f"END"]
+        trace = '\n'.join(trace)
         self.current_unit_trace.append(trace) 
 
         self.unit_propagation_traces.append(self.current_unit_trace)
         self.current_unit_trace = None
-        self.solve_trace.append(trace)
 
 
     ### SOLVE TRACES ###
-    def on_solve_loop_start(self, assignments: dict, decision_level: dict, reason_clauses: dict, level: int):
-        assignments_lst = [var * (-1 if val < 1 else 1) for var, val in assignments.items()]
-        decision_level_adj = [decision_level[var] for var in assignments.keys()]
-        reason_clauses_adj = [reason_clauses[var] if var in reason_clauses else [] for var in assignments.keys()]
+    def on_solve_loop_start(self):
         trace = [
-            f"ASSIGNMENTS {format_list(assignments_lst, is_var=True)}",
-            f"DECISION_LEVELS {format_list(decision_level_adj, is_var=False)}",
-            f"REASON_CLAUSES {format_list(reason_clauses_adj, is_var=True)}",
-            f"LEVEL {level}"
+            f"CALL UNIT_PROPAGATION",
         ]
-        self.solve_trace.append(' '.join(trace)) 
+        self.solve_trace.append('\n'.join(trace)) 
 
-    def on_solve_conflict_found(self, assignments: dict, decision_level: dict, reason_clauses: dict, conflict_clause: list, 
-                                level: int, is_unsat: bool, learned_clause: Optional[list] = None, backtrack_level: Optional[int] = None):
-        assignments_lst = [var * (-1 if val < 1 else 1) for var, val in assignments.items()]
-        decision_level_adj = [decision_level[var] for var in assignments.keys()]
-        reason_clauses_adj = [reason_clauses[var] if var in reason_clauses else [] for var in assignments.keys()]
+    def on_solve_conflict_found(self, level: int, is_unsat: bool):
         trace = [
-            f"ASSIGNMENTS {format_list(assignments_lst, is_var=True)}",
-            f"DECISION_LEVELS {format_list(decision_level_adj, is_var=False)}",
-            f"REASON_CLAUSES {format_list(reason_clauses_adj, is_var=True)}",
-            f"CONFLICT_CLAUSE {format_list(conflict_clause, is_var=True)}",
-            f"LEVEL {level}"
+            f"READ LEVEL {level}",
+            f"IS UNSAT {str(int(is_unsat))}"
         ]
-        if is_unsat:
-            trace = trace + ["UNSAT"] + ["SOLVE_END"]
+        if not is_unsat:
+            trace = trace + [f"CALL ANALYZE_CONFLICT"]
         else:
-            trace = trace + [
-                f"LEARNED_CLAUSE {format_list(learned_clause, is_var=True)}",
-                f"BACKTRACK_LEVEL {backtrack_level}",
-            ]
-        self.solve_trace.append(' '.join(trace)) 
+            trace = trace + [f"END"]
 
-    def on_solve_conflict_not_found(self, n_vars: int, n_assigned_vars: int, is_sat: bool, selected_var: Optional[int] = None):
+        self.solve_trace.append('\n'.join(trace)) 
+
+    def on_solve_conflict_resolved(self):
         trace = [
-            f"N_VARS {n_vars}",  
-            f"N_ASSIGNED_VARS {n_assigned_vars}",  
+            f"BACKTRACK",
+        ]
+        self.solve_trace.append('\n'.join(trace)) 
+
+    def on_solve_conflict_not_found(self, assignments: dict, n_vars: int, n_assigned_vars: int, is_sat: bool, new_lit: Optional[int] = None):
+        assignments_lst = [var * (-1 if val < 1 else 1) for var, val in assignments.items()]
+        trace = [
+            f"READ ASSIGNMENTS {format_list(assignments_lst, is_var=True)}",  
+            f"N_VARS_ASSIGNED {n_assigned_vars}",  
+            f"N_VARS_TOTAL {n_vars}",  
         ]
         if is_sat:
-            trace = trace + ["SAT"] + ["SOLVE_END"]
+            trace = trace + ["SAT"] + ["END"]
         else:
             trace = trace + [
-                f"SELECTED_VAR {selected_var}",
+                f"WRITE LIT {new_lit} REASON None",
             ]
-        self.solve_trace.append(' '.join(trace)) 
+        self.solve_trace.append('\n'.join(trace)) 
 
         
     ### SOLVER START ###
     def on_start(self, clauses: list):
         trace = [
-            f"SOLVE_ARGUMENTS",
-            f"CLAUSES {format_list(clauses, is_var=True)}",
-            f"SOLVE_START",
+            f"FORMULA {format_list(clauses, is_var=True)}",
         ]
-        self.solve_trace.append(' '.join(trace)) 
+        self.solve_trace.append('\n'.join(trace)) 
 
     def get_unit_propagation_trace(self, id: int):
         return self.unit_propagation_traces[id]
@@ -196,76 +171,27 @@ class Tracer:
     def get_analyze_conflict_trace(self, id: int):
         return self.unit_propagation_traces[id]
 
-    def get_solve_trace(self, packed: bool = True) -> list[str]:
-        """
-        If 'packed=True', return exactly what we appended in solve_trace.
-        That means submodules appear only as '..._START' lines plus 
-        '..._RESULTS' lines (the "header" + the final result).
-
-        If 'packed=False', we expand each submodule’s internal lines (i.e. 
-        everything *between* [MODULE_NAME]_START and [MODULE_NAME]_RESULTS) 
-        directly into the solve trace.
-
-        The returned value is a list of lines. You can always do '\n'.join(...) 
-        if you want it as a single string.
-        """
-        if packed:
-            return self.solve_trace
-
-        expanded = []
-        up_index = 0
-        ac_index = 0
+    def get_solve_trace_with_subcalls(self) -> list[str]:
+        full_trace = []
+        unit_idx = 0
+        conflict_idx = 0
         for line in self.solve_trace:
-            expanded.append(line)
-            # Check if this line indicates a submodule start
-            if "UNIT_PROPAGATION_START" in line:
-                sub_lines = self.unit_propagation_traces[up_index]
-                expanded_sub = self._extract_submodule_lines(
-                    sub_lines, "UNIT_PROPAGATION_START", "UNIT_PROPAGATION_RESULTS"
-                )
-                expanded.extend(expanded_sub)
-                up_index += 1
+            full_trace.append(line)
+            if line == "CALL UNIT_PROPAGATION":
+                full_trace.extend(self.unit_propagation_traces[unit_idx])
+                unit_idx += 1
+            elif line == "CALL ANALYZE_CONFLICT":
+                full_trace.extend(self.analyze_conflict_traces[conflict_idx])
+                conflict_idx += 1
+        return full_trace
 
-            elif "ANALYZE_CONFLICT_START" in line:
-                sub_lines = self.analyze_conflict_traces[ac_index]
-                expanded_sub = self._extract_submodule_lines(
-                    sub_lines, "ANALYZE_CONFLICT_START", "ANALYZE_CONFLICT_RESULTS"
-                )
-                expanded.extend(expanded_sub)
-                ac_index += 1
-
-        return expanded
-
-    def _extract_submodule_lines(self, sub_trace: list[str], start_token: str, end_token: str) -> list[str]:
-        """
-        Given an entire submodule trace, return only the lines that appear
-        strictly after [MODULE_NAME]_START and strictly before [MODULE_NAME]_RESULTS,
-        excluding those tokens themselves.
-        """
-        output = []
-        in_logic = False
-
-        for line in sub_trace:
-            if start_token in line:
-                # Once we see the start token, we start collecting lines 
-                # that come after it
-                in_logic = True
-                continue
-
-            if end_token in line:
-                # Once we see the results token, we stop
-                break
-
-            if in_logic:
-                output.append(line)
-
-        return output
-
-    def get_trace(self, packed: bool = True) -> list[str]:
-        if packed:
-            return {'solve_traces': [self.solve_trace], 'unit_prop_traces': self.unit_propagation_traces,
-                    'analyze_conflict_traces': self.analyze_conflict_traces}
-        return self.get_solve_trace(packed=False)
+    def get_trace(self) -> list[str]:
+        return {
+            'solve_trace': self.solve_trace, 
+            'solve_trace_with_subcalls': self.get_solve_trace_with_subcalls(), 
+            'unit_prop_traces': self.unit_propagation_traces,
+            'analyze_conflict_traces': self.analyze_conflict_traces
+        }
 
 def format_lit(literal: int) -> str:
     if literal < 0:
