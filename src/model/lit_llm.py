@@ -1,86 +1,14 @@
-# Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
-
 import torch
-from litgpt import LLM
-from litgpt.data import Alpaca2k
 import lightning as L
-from utils.data import *
-import hydra
-from lightning.pytorch.loggers import WandbLogger
-from omegaconf import DictConfig, OmegaConf
-from callbacks.eval_callback import EvalCallback
-from callbacks.save_callback import SaveBeforeEvalCallback
-from callbacks.training_callback import TrainingCallback
-from config import hf_config
-from litgpt.config import configs, Config, name_to_config
-from litgpt.model import GPT
-from litgpt.api import Preprocessor
-
-import json
-import os
-import wandb
+from typing import Optional
 
 
 class LitLLM(L.LightningModule):
-    def __init__(self, cfg, model, tokenizer, preprocessor, val_dataset_names, control_tokens, num_train, trainer_ckpt_path=None):
+    def __init__(self, cfg, model, tokenizer):
         super().__init__()
-        self.llm = model
-        self.cfg = cfg
-        self.preprocessor = preprocessor
-        self.tokenizer = tokenizer
-        self.val_dataset_names = val_dataset_names
-        self.trainer_ckpt_path = trainer_ckpt_path
-        self.control_tokens = control_tokens
-        self.num_train = num_train
-        _, self.hf_conf = hf_config.get_configs(cfg)
-
-    def setup(self, stage):
-        self.preprocessor.tokenizer.save_pretrained(self.cfg.convert_hf.in_path)
-        with open(os.path.join(self.cfg.convert_hf.in_path, "config.json"), "w") as f:
-            json.dump(self.hf_conf, f, indent=2)
-
-    def mask_targets(self, input_ids, target_ids):
-        """
-        Masks target tokens based on predefined start/end tokens.
-        """
-        module_token = target_ids[:, 1]  # Extracts module-specific token
-        mask = torch.ones_like(target_ids, dtype=torch.bool, device=target_ids.device)  # Default: mask all
-
-        def mask_between(start_token, end_token, mask_end_token = True):
-            """
-            Masks everything between each occurrence of start_token and end_token, separately for each occurrence.
-            """
-            start_positions = (input_ids == start_token).int()  # 1 at start tokens
-            end_positions = (input_ids == end_token).int()  # 1 at end tokens
-
-            # Create segment identifiers for each mask block (each segment gets a unique index)
-            segment_ids = torch.cumsum(start_positions, dim=1)
-
-            # Build mask: active only inside valid segments
-            active_mask = (segment_ids > 0) & (torch.cumsum(end_positions, dim=1) < segment_ids)
-            if mask_end_token:
-                active_mask |= end_positions.bool()  # Mask end token positions
-            return active_mask
-
-        # Apply masks for solve module
-        solve_mask = mask_between(self.control_tokens['solve_tokens']["arguments"], self.control_tokens['solve_tokens']["start"])
-        up_mask = mask_between(self.control_tokens['up_tokens']["arguments"], self.control_tokens['up_tokens']["start"])
-        up_result_mask = mask_between(self.control_tokens['up_tokens']["results"], self.control_tokens['up_tokens']["end"])
-        ac_mask = mask_between(self.control_tokens['ac_tokens']["arguments"], self.control_tokens['ac_tokens']["start"])
-        ac_result_mask = mask_between(self.control_tokens['ac_tokens']["results"], self.control_tokens['ac_tokens']["end"])
-
-        # Apply masks only when the module matches
-        solve_condition = module_token == self.control_tokens['solve_tokens']["arguments"]
-        up_condition = module_token == self.control_tokens['solve_tokens']["arguments"]
-        ac_condition = module_token == self.control_tokens['solve_tokens']["arguments"]
-
-        # Update mask based on conditions
-        mask = torch.where(solve_condition[:, None], solve_mask | up_result_mask | ac_result_mask, mask)
-        mask = torch.where(up_condition[:, None], up_mask, mask)
-        mask = torch.where(ac_condition[:, None], ac_mask, mask)
-
-        # Apply the mask to targets, setting masked positions to -100
-        return torch.where(mask, torch.tensor(-100, device=target_ids.device), target_ids)
+        self._cfg = cfg
+        self._model = model
+        self._tokenizer = tokenizer
 
     def training_step(self, batch: torch.Tensor, batch_idx: int) -> torch.Tensor:
         idx, targets_no_mask, att_mask = (
@@ -253,87 +181,3 @@ class LitLLM(L.LightningModule):
             generated_sequences.append(generated)
 
         return generated_sequences
-
-
-@hydra.main(config_path="config", config_name="config", version_base=None)
-def main(cfg: DictConfig):
-    conf, _ = hf_config.get_configs(cfg)
-
-    wandb_config = OmegaConf.to_container(cfg, resolve=True)
-
-    print("Current model configuration:")
-    print(f"n_layer: {cfg.model.n_layer}")
-    print(f"n_head: {cfg.model.n_head}")
-    print(f"n_embd: {cfg.model.n_embd}")
-    print(f"Model name: {cfg.model.name}")
-
-    batch_size = cfg.model.batch_size
-    accumulate_grad_batches = cfg.model.accumulate_grad_batches
-    num_workers = cfg.data.num_workers
-    tokenizer = get_tokenizer(cfg.tok_data)
-    control_tokens = {
-        'solve_tokens': {
-            'arguments': tokenizer.encode("SOLVE_ARGUMENTS", add_special_tokens=False)[0],
-            'start': tokenizer.encode("SOLVE_START", add_special_tokens=False)[0],
-            'end': tokenizer.encode("SOLVE_END", add_special_tokens=False)[0],
-        },
-        'up_tokens': {
-            'arguments': tokenizer.encode("UNIT_PROPAGATION_ARGUMENTS", add_special_tokens=False)[0],
-            'start': tokenizer.encode("UNIT_PROPAGATION_START", add_special_tokens=False)[0],
-            'results': tokenizer.encode("UNIT_PROPAGATION_RESULTS", add_special_tokens=False)[0],
-            'end': tokenizer.encode("UNIT_PROPAGATION_END", add_special_tokens=False)[0],
-        },
-        'ac_tokens': {
-            'arguments': tokenizer.encode("ANALYZE_CONFLICT_ARGUMENTS", add_special_tokens=False)[0],
-            'start': tokenizer.encode("ANALYZE_CONFLICT_START", add_special_tokens=False)[0],
-            'results': tokenizer.encode("ANALYZE_CONFLICT_RESULTS", add_special_tokens=False)[0],
-            'end': tokenizer.encode("ANALYZE_CONFLICT_END", add_special_tokens=False)[0],
-        },
-        'eos': tokenizer.encode("[EOS]", add_special_tokens=False)[0],
-        'sat': tokenizer.encode("SAT", add_special_tokens=False)[0],
-        'unsat': tokenizer.encode("UNSAT", add_special_tokens=False)[0],
-    }
-    preprocessor = Preprocessor(
-        tokenizer, device="cuda" if torch.cuda.is_available() else "cpu"
-    )
-    val_dataset_names = ['val', 'test']
-    model = LLM(GPT(conf), preprocessor=preprocessor, config=conf)
-
-    datasets = get_data(cfg, tokenizer)
-    data = Datamodule(datasets, batch_size, num_workers, tokenizer)
-    num_train = len(datasets["train"])
-    lit_model = LitLLM(model=model, tokenizer=tokenizer, cfg=cfg, preprocessor=preprocessor, val_dataset_names=val_dataset_names,
-                       control_tokens=control_tokens, num_train=num_train)
-
-    data.connect(max_seq_length=cfg.model.block_size)
-
-    logger = WandbLogger(project=cfg.general.project, name=f"{cfg.general.run_name}", config=wandb_config)
-
-    trainer = L.Trainer(
-        accelerator="cuda",
-        devices=cfg.general.devices,
-        max_epochs=cfg.model.epochs,
-        accumulate_grad_batches=accumulate_grad_batches,
-        precision="16-mixed",
-        # precision="bf16-true",
-        val_check_interval=cfg.eval.val_check_interval,
-        callbacks=[TrainingCallback(
-            epoch_frequency=cfg.eval.callback_epoch_frequency,
-            packed=cfg.data.packed,
-            tokenizer=tokenizer,
-            control_tokens=control_tokens,
-            max_length=cfg.model.block_size,
-            acc_sample_size=cfg.eval.callback_acc_data_count,
-            val_dataset_names=val_dataset_names)
-        ],
-        logger=logger,
-        log_every_n_steps=cfg.eval.log_step_frequency
-    )
-    trainer.fit(lit_model, data)
-
-    lit_model.llm.model.to(lit_model.llm.preprocessor.device)
-    lit_model.llm.save(cfg.convert_hf.in_path)
-
-
-if __name__ == "__main__":
-    main()

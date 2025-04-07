@@ -1,4 +1,5 @@
 from typing import Optional
+import re
 
 class Tracer:
     """
@@ -28,43 +29,43 @@ class Tracer:
                                   conflict_clause: list, level: int):
         self.current_analyze_trace = []
         decision_level_adj = [decision_level[var] for var in assignments.keys()]
-        reason_clauses_adj = [reason_clauses[var] if var in reason_clauses else [] for var in assignments.keys()]
+        reason_clauses_adj = [reason_clauses[var] if var in reason_clauses else '[ None ]' for var in assignments.keys()]
         assignments_lst = [var * (-1 if val < 1 else 1) for var, val in assignments.items()]
         trace = [
-            f"READ ASSIGNMENTS {format_list(assignments_lst, is_var=True)}",
-            f"READ DECISION_LEVELS {format_list(decision_level_adj, is_var=False)}",
-            f"READ REASON_CLAUSES {format_list(reason_clauses_adj, is_var=True)}",
-            f"READ CONFLICT_CLAUSE {format_list(conflict_clause, is_var=True)}",
-            f"READ LEVEL {level}\n",
+            f"ANALYZE_CONFLICT_BEGIN",
+            f"READ ASSIGNMENTS READ_BEGIN {format_list(assignments_lst, is_var=True)} READ_END",
+            f"READ DECISION_LEVELS READ_BEGIN {format_list(decision_level_adj, is_var=False)} READ_END",
+            f"READ REASON_CLAUSES READ_BEGIN {format_list(reason_clauses_adj, is_var=True)} READ_END",
+            f"READ CONFLICT_CLAUSE READ_BEGIN {format_list(conflict_clause, is_var=True)} READ_END",
+            f"READ LEVEL READ_BEGIN {level} READ_END",
         ]
-        trace = '\n'.join(trace)
-        self.current_analyze_trace.append(trace) 
+        self.current_analyze_trace.extend(trace) 
 
     def on_analyze_conflict_iteration_end(self, queue: list, curr_level_vars: set, learned_lits: set, 
                                           is_uip: bool, selected_var: Optional[int] = None, reason_clause: Optional[list] = None):
         trace = [
             f"QUEUE {format_list(queue, is_var=True)}",
             f"RESOLVING {format_lit(selected_var) if selected_var is not None else 'None'}",
-            f"REASON_CLAUSE {format_list(reason_clause, is_var=True) if reason_clause is not None else 'None'}"
+            f"REASON_CLAUSE {format_list(reason_clause, is_var=True) if reason_clause is not None else 'None'}",
             f"CURRENT_LVL_VARS {format_list(list(curr_level_vars), is_var=True)}",
             f"LEARNED_LITS {format_list(list(learned_lits), is_var=True)}",
-            f"IS_UIP {str(int(is_uip))}\n",
+            f"IS_UIP {str(int(is_uip))}",
         ]
-        self.current_analyze_trace.append('\n'.join(trace)) 
+        self.current_analyze_trace.extend(trace) 
 
     def on_analyze_conflict_end(self, new_clause: list):
         trace = [
-            f"WRITE NEW_CLAUSE {format_list(new_clause, is_var=True)}\n",
+            f"WRITE NEW_CLAUSE WRITE_BEGIN {format_list(new_clause, is_var=True)} WRITE_END",
         ]
-        self.current_analyze_trace.append('\n'.join(trace)) 
+        self.current_analyze_trace.extend(trace) 
 
     def on_analyze_conflict_find_backtrack_level_end(self, learned_clause: list, goto_level: int, levels: Optional[list] = None):
         trace = [
             f"DECISION_LEVELS {format_list(levels if levels else [], is_var=False)}",
-            f"WRITE BACKTRACK_LEVEL {goto_level}",
-            f"END"
+            f"WRITE BACKTRACK_LEVEL WRITE_BEGIN {goto_level} WRITE_END",
+            f"ANALYZE_CONFLICT_END"
         ]
-        self.current_analyze_trace.append('\n'.join(trace)) 
+        self.current_analyze_trace.extend(trace) 
 
         self.analyze_conflict_traces.append(self.current_analyze_trace)
         self.current_analyze_trace = None
@@ -76,12 +77,12 @@ class Tracer:
         clauses_combined = clauses + learned_clauses
         assignments_lst = [var * (-1 if val < 1 else 1) for var, val in assignments.items()]
         trace = [
-            f"READ CLAUSES {format_list(clauses, is_var=True)}",
-            f"READ LEARNED_CLAUSES {format_list(learned_clauses, is_var=True)}",
-            f"READ ASSIGNMENTS {format_list(assignments_lst, is_var=True)}\n",
+            f"UNIT_PROPAGATION_BEGIN",
+            f"READ CLAUSES READ_BEGIN {format_list(clauses, is_var=True)} READ_END",
+            f"READ LEARNED_CLAUSES READ_BEGIN {format_list(learned_clauses, is_var=True)} READ_END",
+            f"READ ASSIGNMENTS READ_BEGIN {format_list(assignments_lst, is_var=True)} READ_END",
         ]
-        trace = '\n'.join(trace)
-        self.current_unit_trace.append(trace) 
+        self.current_unit_trace.extend(trace) 
 
     def on_unit_propagation_clause_propagation_loop_end(self, clause: list, all_assigned: bool, satisfied: bool,
                                                         conflict: bool, is_unit: Optional[bool] = None, 
@@ -95,23 +96,22 @@ class Tracer:
         ]
         if learned_literal is not None:
             trace = trace + [
-                f"WRITE LIT {format_lit(learned_literal)} REASON {format_list(clause, is_var=True)}\n",
+                f"WRITE LIT WRITE_BEGIN {format_lit(learned_literal)} REASON {format_list(clause, is_var=True)} WRITE_END",
             ]
-        self.current_unit_trace.append('\n'.join(trace)) 
+        self.current_unit_trace.extend(trace) 
 
     def on_unit_propagation_loop_end(self, propagated: bool):
         trace = [
             f"PROPAGATED {str(int(propagated))}",
         ]
-        self.current_unit_trace.append('\n'.join(trace)) 
+        self.current_unit_trace.extend(trace) 
 
     def on_unit_propagation_end(self, conflict_clause: Optional[list]):
         trace = []
         if conflict_clause is not None:
-            trace = [f"WRITE CONFLICT_CLAUSE {format_list(conflict_clause, is_var=True)}"]
-        trace = trace + [f"END"]
-        trace = '\n'.join(trace)
-        self.current_unit_trace.append(trace) 
+            trace = [f"WRITE CONFLICT_CLAUSE WRITE_BEGIN {format_list(conflict_clause, is_var=True)} WRITE_END"]
+        trace = trace + [f"UNIT_PROPAGATION_END"]
+        self.current_unit_trace.extend(trace) 
 
         self.unit_propagation_traces.append(self.current_unit_trace)
         self.current_unit_trace = None
@@ -122,67 +122,77 @@ class Tracer:
         trace = [
             f"CALL UNIT_PROPAGATION",
         ]
-        self.solve_trace.append('\n'.join(trace)) 
+        self.solve_trace.extend(trace) 
 
     def on_solve_conflict_found(self, level: int, is_unsat: bool):
         trace = [
-            f"READ LEVEL {level}",
+            f"READ LEVEL READ_BEGIN {level} READ_END",
             f"IS UNSAT {str(int(is_unsat))}"
         ]
         if not is_unsat:
             trace = trace + [f"CALL ANALYZE_CONFLICT"]
         else:
-            trace = trace + [f"END"]
+            trace = trace + [f"SOLVE_END"]
 
-        self.solve_trace.append('\n'.join(trace)) 
+        self.solve_trace.extend(trace) 
 
     def on_solve_conflict_resolved(self):
         trace = [
             f"BACKTRACK",
         ]
-        self.solve_trace.append('\n'.join(trace)) 
+        self.solve_trace.extend(trace)
 
     def on_solve_conflict_not_found(self, assignments: dict, n_vars: int, n_assigned_vars: int, is_sat: bool, new_lit: Optional[int] = None):
         assignments_lst = [var * (-1 if val < 1 else 1) for var, val in assignments.items()]
         trace = [
-            f"READ ASSIGNMENTS {format_list(assignments_lst, is_var=True)}",  
+            f"READ ASSIGNMENTS READ_BEGIN {format_list(assignments_lst, is_var=True)} READ_END",  
             f"N_VARS_ASSIGNED {n_assigned_vars}",  
             f"N_VARS_TOTAL {n_vars}",  
         ]
         if is_sat:
-            trace = trace + ["SAT"] + ["END"]
+            trace = trace + ["SAT"] + ["SOLVE_END"]
         else:
             trace = trace + [
-                f"WRITE LIT {new_lit} REASON None",
+                f"WRITE LIT WRITE_BEGIN {new_lit} REASON None WRITE_END",
             ]
-        self.solve_trace.append('\n'.join(trace)) 
+        self.solve_trace.extend(trace) 
 
         
     ### SOLVER START ###
     def on_start(self, clauses: list):
         trace = [
-            f"FORMULA {format_list(clauses, is_var=True)}",
+            f"SOLVE_BEGIN",
+            f"READ FORMULA READ_BEGIN {format_list(clauses, is_var=True)} READ_END",
         ]
-        self.solve_trace.append('\n'.join(trace)) 
+        self.solve_trace.extend(trace) 
 
     def get_unit_propagation_trace(self, id: int):
         return self.unit_propagation_traces[id]
 
     def get_analyze_conflict_trace(self, id: int):
-        return self.unit_propagation_traces[id]
+        return self.analyze_conflict_traces[id]
 
     def get_solve_trace_with_subcalls(self) -> list[str]:
         full_trace = []
         unit_idx = 0
         conflict_idx = 0
+
+        def simplify_reads(trace):
+            return [
+                "READ CLAUSES"
+                if line.startswith("READ CLAUSES") else line
+                for line in trace
+            ]
+
         for line in self.solve_trace:
             full_trace.append(line)
             if line == "CALL UNIT_PROPAGATION":
-                full_trace.extend(self.unit_propagation_traces[unit_idx])
+                full_trace.extend(simplify_reads(self.unit_propagation_traces[unit_idx]))
                 unit_idx += 1
             elif line == "CALL ANALYZE_CONFLICT":
                 full_trace.extend(self.analyze_conflict_traces[conflict_idx])
                 conflict_idx += 1
+
         return full_trace
 
     def get_trace(self) -> list[str]:
@@ -207,7 +217,7 @@ def format_list(data, is_var=False) -> str:
     if isinstance(data, list):
         # Build each element’s string and join with spaces
         contents = " ".join(format_list(item, is_var=is_var) for item in data)
-        return f"[{contents}]"
+        return f"[ {contents} ]"
     
     # Fallback for types that aren’t int or list
     return str(data)

@@ -3,7 +3,7 @@ from typing import Optional
 import re
 
 @dataclass
-class Scratchpad:
+class CDCLScratchpad:
     assignments: dict[int, bool]
     decision_levels: dict[int, int]
     reason_clauses: dict[int, list[int]]

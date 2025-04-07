@@ -1,9 +1,6 @@
-from pysat.solvers import Glucose3
 import random
-import argparse
-import numpy as np
-from tqdm import tqdm
-from tracer import Tracer
+from src.cdcl_env.tracer import Tracer
+
 
 class CDCLSolver:
     def __init__(self, clauses, tracer: Tracer):
@@ -190,51 +187,3 @@ class CDCLSolver:
 
     def get_tracer(self):
         return self.tracer
-
-def main(args):
-    from generate_data import generate_random_formula
-
-    formulas = []
-    for _ in range(args.n_formulas):
-        formulas.append(generate_random_formula(n_vars=args.n_vars))
-
-    for clauses in formulas:
-        g = Glucose3()
-        for clause in clauses:
-            g.add_clause(clause)
-        is_sat_pysat = g.solve()
-        g.delete()
-
-        solver = CDCLSolver(clauses, Tracer())
-        is_satisfiable = solver.solve()
-        assert is_sat_pysat == is_satisfiable
-
-        if is_satisfiable:
-            # Verify CDCL solution using PySAT
-            g_verify = Glucose3()
-            for clause in clauses:
-                g_verify.add_clause(clause)
-            assumptions = []
-            for var, value in solver.assignments.items():
-                assumptions.append(var if value else -var)
-            
-            # Check if solution satisfies formula
-            is_valid = g_verify.solve(assumptions=assumptions)
-            assert is_valid
-
-    # print an example trace from CDCLSolver
-    trace = solver.tracer.get_trace()
-    print('\n'.join(trace['solve_trace_with_subcalls']))
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Test custom CDCL Solver with generated SAT formulas.")
-    parser.add_argument(
-        "--n_formulas", type=int, default=50,
-        help="Number of formulas to generate (default: 50)."
-    )
-    parser.add_argument(
-        "--n_vars", type=int, default=10,
-        help="Number of variables in the generated formulas (default: 10)."
-    )
-    args = parser.parse_args()
-    main(args)

@@ -10,59 +10,56 @@ hydra:
 
 general:
   project: "SAT"
-  run_name: "Pythia-6-8-512-dfs_packed_50k"
+  run_name: > 
+    ${now:%Y-%m-%d_%H-%M-%S}-pythia-${train.model.n_layer}x${train.model.n_head}x${train.model.n_embd}
+    _bs${train.trainer.batch_size}_ctx${train.model.block_size}
+    _subs=${data.separated_subcalls}
   devices: [0]
 
-tok_data:
-  tokenizer_path: "${model.tokenizer_path}/tokenizer.json"
+paths:
+  root_dir: "runs/${general.run_name}"
+  checkpoint_dir: "${paths.root_dir}/checkpoints"
+  eval_results: "${paths.root_dir}/eval_results"
+  config_export: "${paths.root_dir}/config.yaml"
+  tokenizer: "tokenizer/tokenizer.json"
+  data: "data"
 
 data:
-  packed: True
-  datapath: data
-  train_file: "../data/cdcl_dataset_3-6_100k.json"
-  test_file: "../data/cdcl_dataset_7-8_1k.json"
-  num_train: 50000
-  num_test: 1000
-  num_workers: 64
+  separated_subcalls: True
+  files:
+    # train: "${paths.data}/cdcl_data_train.json"
+    train: "${paths.data}/cdcl_data_train_mock.json"
+    # val: "${paths.data}/cdcl_data_val.json"
+    # test: "${paths.data}/cdcl_data_test.json"
+    # ood: "${paths.data}/cdcl_data_ood.json"
+  num_workers: 96
+  tokenize_batch_size: 256
+  mask_structural_tokens: ["SOLVE_BEGIN", "UNIT_PROPAGATION_BEGIN", "ANALYZE_CONFLICT_BEGIN"]
+  mask_block_markers: ["READ_BEGIN", "READ_END"]
 
-model:
-  name: "Pythia-${model.n_layer}-${model.n_head}-${model.n_embd}-dfs-packed_50k"
-  batch_size: 32
-  accumulate_grad_batches: 2
-  block_size: 2000
-  epochs: 5
-  n_layer: 6
-  n_head: 8
-  n_embd: 512
-  vocab_size: 76
-  padded_vocab_size: 76
-  bos_id: 72
-  eos_id: 75
-  checkpoint_dir: "model/${dl_model.full_path}"
-  tokenizer_path: "model/${dl_model.full_path}"
+train:
+  trainer:
+    batch_size: 32
+    accumulate_grad_batches: 2
+    epochs: 5
 
-optimizer:
-  warmup_steps: 500
-  lr: 1e-4
-  weight_decay: 0.01
-  betas: [0.9, 0.999]
+  model:
+    n_layer: 6
+    n_head: 8
+    n_embd: 512
+    block_size: 1250
+
+  optimizer:
+    warmup_steps: 500
+    lr: 1e-4
+    weight_decay: 0.01
+    betas: [0.9, 0.999]
 
 eval:
-  config_path: "${model.checkpoint_dir}/model_config.json"
   num_examples: 128
   batch_size: 32
   eval_interval: 10
-  results_dir: "data/eval_results/${model.name}"
   log_step_frequency: 50
   val_check_interval: 0.1
   callback_epoch_frequency: 1
   callback_acc_data_count: 200
-
-dl_model:
-  model_folder: "checkpoints"
-  name: "EleutherAI/pythia-160m"
-  full_path: "${dl_model.model_folder}/${dl_model.name}/"
-
-convert_hf:
-  in_path: "temp/${model.name}"
-  out_path: "temp/hf_${model.name}"
