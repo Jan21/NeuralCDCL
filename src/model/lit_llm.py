@@ -69,115 +69,44 @@ class LitLLM(L.LightningModule):
         stop_token: int,
         temperature: float = 1.0,
     ) -> list[torch.Tensor]:
-        """
-        Generate text using the model, handling variable input lengths properly.
-        """
-        self.eval()
-        generated_sequences = []
+        # You probably want one env per input sequence
+        outputs = []
 
-        for input_ids in inputs:
-            current_input = torch.tensor(input_ids, device=self.device).unsqueeze(0)  # Shape (1, seq_len)
-            generated = current_input
+        for input_seq in inputs:
+            # Initialize environment
+            env = AutoregressiveCDCLEnvironment(
+                registry=self._command_registry,
+                scratchpad=CDCLScratchpad(),  # You may want to pass something pre-initialized
+                command_parser=CommandParser(self._command_registry)
+            )
 
-            for _ in range(max_length - current_input.size(1)):
-                with torch.no_grad():
-                    logits = self(generated)[:, -1, :]  # (1, vocab_size)
+            # Init env with the input sequence
+            input_ids = input_seq.tolist()
+            for tok in input_ids:
+                env.append(tok)  # Bootstrap environment
 
+            # Autoregressive generation
+            for _ in range(max_length):
+                # Get the current sequence
+                current_input = env.get_current_input()
+                input_tensor = torch.tensor(current_input, dtype=torch.long, device=self.device).unsqueeze(0)
+
+                # Get logits
+                logits = self._model(input_tensor)[:, -1, :]  # Shape: [1, vocab_size]
                 logits = logits / temperature
-                probs = torch.softmax(logits, dim=-1)
-                next_token = torch.multinomial(probs, num_samples=1)  # (1, 1)
-                generated = torch.cat([generated, next_token], dim=-1)
+                probs = torch.nn.functional.softmax(logits, dim=-1)
 
-                if next_token.item() == stop_token:
+                # Sample next token
+                next_token = torch.multinomial(probs, num_samples=1).item()
+
+                # Append to environment
+                env_output = env.append(next_token)
+
+                # Stopping condition
+                if next_token == stop_token:
                     break
 
-            generated_sequences.append(generated)
+            final_output = torch.tensor(env.get_current_input(), dtype=torch.long)
+            outputs.append(final_output)
 
-        return generated_sequences
-
-    def generate_packed(
-        self,
-        inputs: list[torch.Tensor],
-        max_length: int,
-        stop_token: int,
-        temperature: float = 1.0,
-    ) -> list[torch.Tensor]:
-        """
-        Generate text while dynamically adjusting context when encountering UNIT_PROPAGATION_START or ANALYZE_CONFLICT_START.
-        """
-        self.eval()
-        generated_sequences = []
-
-        from tqdm import tqdm
-        for input_ids in tqdm(inputs, 'Generating pred'):
-            current_input = torch.tensor(input_ids, device=self.device).unsqueeze(0)  # (1, seq_len)
-            generated = current_input
-            saved_context = None  # To store original context before modifying
-
-            while True:
-                for _ in range(max_length - generated.size(1)):
-                    with torch.no_grad():
-                        logits = self(generated)[:, -1, :]  # (1, vocab_size)
-
-                    logits = logits / temperature
-                    probs = torch.softmax(logits, dim=-1)
-                    next_token = torch.multinomial(probs, num_samples=1)  # (1, 1)
-                    generated = torch.cat([generated, next_token], dim=-1)
-
-                    if next_token.item() == stop_token:
-                        break
-
-                    # Detect transition to UP or AC and store context
-                    if next_token.item() in [self.control_tokens["up_tokens"]["start"], self.control_tokens["ac_tokens"]["start"]]:
-                        saved_context = generated.clone()  # Save context so far
-                        break  # Stop and prepare new context
-
-                if saved_context is None:
-                    break  # End generation for this input
-
-                # Prepare new context
-                start_token = next_token.item()
-                if start_token == self.control_tokens["up_tokens"]["start"]:
-                    arguments_token = self.control_tokens["up_tokens"]["arguments"]
-                    results_token = self.control_tokens["up_tokens"]["results"]
-                    end_token = self.control_tokens["up_tokens"]["end"]
-                else:  # ANALYZE_CONFLICT
-                    arguments_token = self.control_tokens["ac_tokens"]["arguments"]
-                    results_token = self.control_tokens["ac_tokens"]["results"]
-                    end_token = self.control_tokens["ac_tokens"]["end"]
-
-                # Extract new context up to and including UNIT_PROPAGATION_ARGUMENTS / ANALYZE_CONFLICT_ARGUMENTS
-                arg_indices = (generated == arguments_token).nonzero(as_tuple=True)[1]
-                if len(arg_indices) == 0:
-                    break  # model error
-                arg_index = arg_indices[-1].item()
-                new_context = torch.cat([torch.tensor([[self.tokenizer.bos_token_id]], device=self.device), generated[:, arg_index:]], dim=1)
-
-                # Generate continuation with new context
-                generated = new_context
-                while generated.size(1) < max_length:
-                    with torch.no_grad():
-                        logits = self(generated)[:, -1, :]
-                    logits = logits / temperature
-                    probs = torch.softmax(logits, dim=-1)
-                    next_token = torch.multinomial(probs, num_samples=1)
-                    generated = torch.cat([generated, next_token], dim=-1)
-
-                    if next_token.item() == stop_token or next_token.item() == end_token:
-                        break
-                
-                # Extract results between RESULTS and END
-                try:
-                    results_start_idx = (generated == results_token).nonzero(as_tuple=True)[1][0].item()
-                    results_end_idx = (generated == end_token).nonzero(as_tuple=True)[1][0].item() + 1
-                    extracted_results = generated[:, results_start_idx:results_end_idx]
-                except IndexError:
-                    extracted_results = torch.tensor([], device=self.device).long()  # No valid results found
-
-                # Append results to saved context and continue generating
-                generated = torch.cat([saved_context, extracted_results], dim=-1)
-                saved_context = None  # Reset context since it has been updated
-
-            generated_sequences.append(generated)
-
-        return generated_sequences
+        return outputs

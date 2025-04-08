@@ -105,8 +105,11 @@ class DatasetPipeline:
         num_batches = len(batches)
         print(f"Tokenizing {len(texts)} texts using futures ({num_batches} batches)...")
 
-        structural_tokens = set(self._cfg.data.mask_structural_tokens)
-        block_markers = tuple(self._cfg.data.mask_block_markers)
+        spec_toks = self._cfg.data.special_tokens
+        structural_tokens = set([spec_toks['solve_markers'][0]] + 
+                                [spec_toks['unit_prop_markers'][0]] +
+                                [spec_toks['analyze_conflict_markers'][0]])
+        block_markers = tuple(spec_toks.read_block_markers)
 
         with ProcessPoolExecutor(max_workers=self._num_workers) as executor:
             futures = [
@@ -139,6 +142,12 @@ class DatasetPipeline:
 
     def _collate_fn(self, batch: list[dict[str, torch.Tensor]]) -> dict[str, torch.Tensor]:
         pad_id = self._tokenizer.token_to_id("[PAD]")
+
+        # Filter out items that are too long
+        batch = [
+            item for item in batch
+            if item["input_ids"].shape[0] <= self._block_size
+        ]
 
         input_ids = [item["input_ids"] for item in batch]
         attention_mask = [item["attention_mask"] for item in batch]

@@ -17,6 +17,7 @@ from tokenizers import Tokenizer
 from src.dataset.dataset_pipeline import DatasetPipeline
 from src.dataset.datamodule import Datamodule
 from src.model.lit_llm import LitLLM
+from src.model.command_registry import CommandRegistry
 
 import wandb
 
@@ -31,6 +32,10 @@ def main(cfg: DictConfig):
     datasets = pipeline.build()
     dataloaders = pipeline.build_dataloaders(datasets)
     datamodule = Datamodule(dataloaders=dataloaders)
+    
+    CommandRegistry(cfg, tokenizer)
+
+    exit()
 
     # LitGPT.
     lit_cfg = Config(

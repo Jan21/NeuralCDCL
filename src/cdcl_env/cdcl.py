@@ -37,7 +37,7 @@ class CDCLSolver:
                 value = random.choice([True, False])
                 lit = var if value else -var
                 # self.assign(var, True, None)
-                self.tracer.on_solve_conflict_not_found(self.assignments, n_vars, n_assigned_vars, False, lit)
+                self.tracer.on_solve_conflict_not_found(self.assignments, n_vars, n_assigned_vars, False, lit, self.level)
                 self.level += 1
                 self.assign(var, value, None)
 
@@ -57,7 +57,7 @@ class CDCLSolver:
                     var = abs(lit)
                     value = lit > 0
                     self.assign(var, value, clause)
-                    self.tracer.on_unit_propagation_clause_propagation_loop_end(clause, status, value, False, True, lit)
+                    self.tracer.on_unit_propagation_clause_propagation_loop_end(clause, status, value, False, True, lit, self.level)
                     propagated = True
             self.tracer.on_unit_propagation_loop_end(propagated)
             if not propagated:
