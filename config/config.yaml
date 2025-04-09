@@ -28,9 +28,9 @@ data:
   separated_subcalls: True
   files:
     train: "${paths.data}/cdcl_data_train.json"
-    # val: "${paths.data}/cdcl_data_val.json"
-    # test: "${paths.data}/cdcl_data_test.json"
-    # ood: "${paths.data}/cdcl_data_ood.json"
+    val: "${paths.data}/cdcl_data_val.json"
+    test: "${paths.data}/cdcl_data_test.json"
+    ood: "${paths.data}/cdcl_data_ood.json"
   num_workers: 96
   tokenize_batch_size: 256
   special_tokens:
@@ -45,16 +45,20 @@ data:
       - "READ_LEVEL"
     write_block_markers: ["WRITE_BEGIN", "WRITE_END"]
     write_cmd_tokens:
-      - "WRITE_ASSIGNMENTS"
-      - "WRITE_REASON_CLAUSES"
-      - "WRITE_DECISION_LEVELS"
+      - "WRITE_ASSIGNMENTS_APPEND"
+      - "WRITE_REASON_CLAUSES_APPEND"
+      - "WRITE_DECISION_LEVELS_APPEND"
+      - "WRITE_LEARNED_CLAUSES_APPEND"
       - "WRITE_BACKTRACK_LEVEL"
       - "WRITE_CONFLICT_CLAUSE"
-      - "WRITE_LEARNED_CLAUSEs"
-    action_cmd_tokens: ["BACKTRACK", "CALL_UNIT_PROPAGATION", "CALL_ANALYZE_CONFLICT"]
+    action_cmd_tokens: ["BACKTRACK", "LEVEL_UP", "CALL_UNIT_PROPAGATION", "CALL_ANALYZE_CONFLICT"]
     solve_markers: ["SOLVE_BEGIN", "SOLVE_END"]
     unit_prop_markers: ["UNIT_PROPAGATION_BEGIN", "UNIT_PROPAGATION_END"]
     analyze_conflict_markers: ["ANALYZE_CONFLICT_BEGIN", "ANALYZE_CONFLICT_END"]
+    semantic_markers: ["[", "]"]
+    counter_unit_token: "I"
+    sat_token: "SAT"
+    unsat_token: "UNSAT"
 
 train:
   trainer:

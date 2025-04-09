@@ -17,3 +17,9 @@ class CommandRegistry:
         self.solve_block_markers = tuple(tokenizer.token_to_id(tok) for tok in spec.solve_markers)
         self.up_block_markers = tuple(tokenizer.token_to_id(tok) for tok in spec.unit_prop_markers)
         self.ac_block_markers = tuple(tokenizer.token_to_id(tok) for tok in spec.analyze_conflict_markers)
+        self.semantic_block_markers = tuple(tokenizer.token_to_id(tok) for tok in spec.semantic_markers)
+
+        self.counter_unit_token = tokenizer.token_to_id(spec.counter_unit_token)
+
+        self.sat_token = tokenizer.token_to_id(spec.sat_token)
+        self.unsat_token = tokenizer.token_to_id(spec.unsat_token)

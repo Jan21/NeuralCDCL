@@ -1,12 +1,12 @@
 import sys, os
-
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import matplotlib.pyplot as plt
 from omegaconf import DictConfig
 import hydra
 from hydra.utils import to_absolute_path
-from src.dataset.dataset_pipeline import DatasetPipeline, load_tokenizer
+from src.data.pipeline import DatasetPipeline
+from tokenizers import Tokenizer
 
 
 def compute_token_lengths(dataset):
@@ -15,7 +15,7 @@ def compute_token_lengths(dataset):
 
 def plot_token_length_histogram(lengths, file_path: str, split="train"):
     plt.figure()
-    plt.hist(lengths, bins=30, edgecolor="black")
+    plt.hist(lengths, bins=50, edgecolor="black")
     plt.title(f"Token Length Distribution - {split}")
     plt.xlabel("Token Length")
     plt.ylabel("Frequency")
@@ -29,7 +29,7 @@ def plot_token_length_histogram(lengths, file_path: str, split="train"):
 def main(cfg: DictConfig):
     with_subcalls = 'separated_subcalls' if cfg.data.separated_subcalls else ''
 
-    tokenizer = load_tokenizer(cfg.paths.tokenizer)
+    tokenizer = Tokenizer.from_file(to_absolute_path(cfg.paths.tokenizer))
     pipeline = DatasetPipeline(cfg, tokenizer)
     datasets = pipeline.build()
 

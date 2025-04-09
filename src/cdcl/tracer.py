@@ -23,21 +23,22 @@ class Tracer:
         self.current_unit_trace: Optional[list[str]] = None
         self.current_analyze_trace: Optional[list[str]] = None
 
+        self.input_clauses_trace = None
 
     ### ANALYZE_CONFLICT TRACES ###
     def on_analyze_conflict_start(self, assignments: dict, decision_level: dict, reason_clauses: dict, 
                                   conflict_clause: list, level: int):
         self.current_analyze_trace = []
-        decision_level_adj = [decision_level[var] for var in assignments.keys()]
+        decision_level_adj = [[decision_level[var]] for var in assignments.keys()]
         reason_clauses_adj = [reason_clauses[var] if var in reason_clauses else '[ None ]' for var in assignments.keys()]
         assignments_lst = [var * (-1 if val < 1 else 1) for var, val in assignments.items()]
         trace = [
             f"ANALYZE_CONFLICT_BEGIN",
             f"READ_ASSIGNMENTS READ_BEGIN {format_list(assignments_lst, is_var=True)} READ_END",
-            f"READ_DECISION_LEVELS READ_BEGIN {format_list(decision_level_adj, is_var=False)} READ_END",
+            f"READ_DECISION_LEVELS READ_BEGIN {format_list(decision_level_adj, is_var=False, use_unary=True)} READ_END",
             f"READ_REASON_CLAUSES READ_BEGIN {format_list(reason_clauses_adj, is_var=True)} READ_END",
             f"READ_CONFLICT_CLAUSE READ_BEGIN {format_list(conflict_clause, is_var=True)} READ_END",
-            f"READ_LEVEL READ_BEGIN {level} READ_END",
+            f"READ_LEVEL READ_BEGIN {encode_number_unary(level)} READ_END",
         ]
         self.current_analyze_trace.extend(trace) 
 
@@ -55,14 +56,14 @@ class Tracer:
 
     def on_analyze_conflict_end(self, new_clause: list):
         trace = [
-            f"WRITE_LEARNED_CLAUSES WRITE_BEGIN {format_list(new_clause, is_var=True)} WRITE_END",
+            f"WRITE_LEARNED_CLAUSES_APPEND WRITE_BEGIN {format_list(new_clause, is_var=True)} WRITE_END",
         ]
         self.current_analyze_trace.extend(trace) 
 
     def on_analyze_conflict_find_backtrack_level_end(self, learned_clause: list, goto_level: int, levels: Optional[list] = None):
         trace = [
-            f"DECISION_LEVELS {format_list(levels if levels else [], is_var=False)}",
-            f"WRITE_BACKTRACK_LEVEL WRITE_BEGIN {goto_level} WRITE_END",
+            f"DECISION_LEVELS {format_list(list(map(lambda x: [x], levels)) if levels else [], is_var=False, use_unary=True)}",
+            f"WRITE_BACKTRACK_LEVEL WRITE_BEGIN {encode_number_unary(goto_level)} WRITE_END",
             f"ANALYZE_CONFLICT_END"
         ]
         self.current_analyze_trace.extend(trace) 
@@ -96,9 +97,9 @@ class Tracer:
         ]
         if learned_literal is not None:
             trace = trace + [
-                f"WRITE_ASSIGNMENTS WRITE_BEGIN {format_lit(learned_literal)} WRITE_END",
-                f"WRITE_DECISION_LEVELS WRITE_BEGIN {level} WRITE_END",
-                f"WRITE_REASON_CLAUSES WRITE_BEGIN {format_list(clause, is_var=True)} WRITE_END",
+                f"WRITE_ASSIGNMENTS_APPEND WRITE_BEGIN {format_lit(learned_literal)} WRITE_END",
+                f"WRITE_DECISION_LEVELS_APPEND WRITE_BEGIN {encode_number_unary(level)} WRITE_END",
+                f"WRITE_REASON_CLAUSES_APPEND WRITE_BEGIN {format_list(clause, is_var=True)} WRITE_END",
             ]
         self.current_unit_trace.extend(trace) 
 
@@ -128,7 +129,7 @@ class Tracer:
 
     def on_solve_conflict_found(self, level: int, is_unsat: bool):
         trace = [
-            f"READ_LEVEL READ_BEGIN {level} READ_END",
+            f"READ_LEVEL READ_BEGIN {encode_number_unary(level)} READ_END",
             f"IS UNSAT {str(int(is_unsat))}"
         ]
         if not is_unsat:
@@ -149,16 +150,17 @@ class Tracer:
         assignments_lst = [var * (-1 if val < 1 else 1) for var, val in assignments.items()]
         trace = [
             f"READ_ASSIGNMENTS READ_BEGIN {format_list(assignments_lst, is_var=True)} READ_END",  
-            f"N_VARS_ASSIGNED {n_assigned_vars}",  
-            f"N_VARS_TOTAL {n_vars}",  
+            f"N_VARS_ASSIGNED {encode_number_unary(n_assigned_vars)}",  
+            f"N_VARS_TOTAL {encode_number_unary(n_vars)}",  
         ]
         if is_sat:
             trace = trace + ["SAT"] + ["SOLVE_END"]
         else:
             trace = trace + [
-                f"WRITE_ASSIGNMENTS WRITE_BEGIN {new_lit} WRITE_END",
-                f"WRITE_DECISION_LEVELS WRITE_BEGIN {level} WRITE_END",
-                f"WRITE_REASON_CLAUSES WRITE_BEGIN None WRITE_END",
+                f"WRITE_ASSIGNMENTS_APPEND WRITE_BEGIN {format_lit(new_lit)} WRITE_END",
+                f"WRITE_DECISION_LEVELS_APPEND WRITE_BEGIN {encode_number_unary(level)} WRITE_END",
+                f"WRITE_REASON_CLAUSES_APPEND WRITE_BEGIN None WRITE_END",
+                f"LEVEL_UP"
             ]
         self.solve_trace.extend(trace) 
 
@@ -169,6 +171,7 @@ class Tracer:
             f"SOLVE_BEGIN",
             f"READ_CLAUSES READ_BEGIN {format_list(clauses, is_var=True)} READ_END",
         ]
+        self.input_clauses_trace = format_list(clauses, is_var=True)
         self.solve_trace.extend(trace) 
 
     def get_unit_propagation_trace(self, id: int):
@@ -202,27 +205,39 @@ class Tracer:
 
     def get_trace(self) -> list[str]:
         return {
+            'input_clauses': self.input_clauses_trace,
             'solve_trace': self.solve_trace, 
             'solve_trace_with_subcalls': self.get_solve_trace_with_subcalls(), 
             'unit_prop_traces': self.unit_propagation_traces,
             'analyze_conflict_traces': self.analyze_conflict_traces
         }
 
+def encode_number_unary(num: int) -> str:
+    return ' '.join(['I'] * num)
+
 def format_lit(literal: int) -> str:
     if literal < 0:
         return f"-x{abs(literal)}"
     return f"x{literal}"
 
-def format_list(data, is_var=False) -> str:
+def format_list(data, is_var=False, brackets=False, use_unary=False) -> str:
     # If it's just a single integer:
     if isinstance(data, int):
-        return format_lit(data) if is_var else str(data)
+        if is_var:
+            return format_lit(data) 
+        elif use_unary:
+            return encode_number_unary(data)
+        else:
+            return str(data)
     
     # If it's a list, recurse on each item:
     if isinstance(data, list):
         # Build each element’s string and join with spaces
-        contents = " ".join(format_list(item, is_var=is_var) for item in data)
-        return f"[ {contents} ]"
+        contents = " ".join(format_list(item, is_var=is_var, brackets=True, use_unary=use_unary) for item in data)
+        if brackets:
+            return f"[ {contents} ]"
+        else:
+            return contents
     
     # Fallback for types that aren’t int or list
     return str(data)

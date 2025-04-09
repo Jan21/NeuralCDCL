@@ -1,6 +1,6 @@
-from src.model.command_registry import CommandRegistry
+from model.registry import CommandRegistry
 from src.cdcl_env.cdcl_scratchpad import CDCLScratchpad
-from src.model.command_parser import CommandParser
+from model.parser import CommandParser
 
 
 class AutoregressiveCDCLEnvironment:
@@ -8,7 +8,7 @@ class AutoregressiveCDCLEnvironment:
         self._registry = registry
         self._scratchpad = scratchpad
 
-        self._history = []
+        self._history = [registry.solve_block_markers[0]]
         self._command_parser = command_parser
         self._stashed_history = None
 
@@ -17,8 +17,9 @@ class AutoregressiveCDCLEnvironment:
         self._unit_prop_end = self._registry.up_block_markers[1]
         self._ac_begin = self._registry.ac_block_markers[0]
         self._ac_end = self._registry.ac_block_markers[1]
+        self._solve_end = self._registry.solve_block_markers[1]
 
-    def append(self, token: int) -> list[int]:
+    def append(self, token: int):
         """
         Process a single token emitted by the model. Returns the current input to feed back.
         """
@@ -39,8 +40,6 @@ class AutoregressiveCDCLEnvironment:
         elif token in [self._unit_prop_end, self._ac_end]:
             self._restore_history()
 
-        return self._get_current_input()
-
     def get_current_input(self) -> list[int]:
         return self._history
 
@@ -54,3 +53,6 @@ class AutoregressiveCDCLEnvironment:
             self._history = self._stashed_history
             self._stashed_history = None
             self._command_parser.reset()
+
+    def is_finished(self) -> bool:
+        return self._history[-1] == self._solve_end

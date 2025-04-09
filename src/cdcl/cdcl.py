@@ -1,5 +1,5 @@
 import random
-from src.cdcl_env.tracer import Tracer
+from .tracer import Tracer
 
 
 class CDCLSolver:

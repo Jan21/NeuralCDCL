@@ -1,4 +1,4 @@
-from src.model.command_registry import CommandRegistry
+from model.registry import CommandRegistry
 from typing import Optional
 
 

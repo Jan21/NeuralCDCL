@@ -10,8 +10,8 @@ from typing import Optional
 from pysat.solvers import Glucose3
 
 from tqdm import tqdm
-from src.cdcl_env.cdcl import CDCLSolver
-from src.cdcl_env.tracer import Tracer
+from src.cdcl.cdcl import CDCLSolver
+from src.cdcl.tracer import Tracer
 
 
 def validate_cdcl_with_pysat(clauses: list[list[int]], is_satisfiable: bool, assignments: dict[int, bool]) -> None:
@@ -108,13 +108,15 @@ def main(args: argparse.Namespace) -> None:
             new_indices = sorted(random.sample(range(1, args.remap_variables + 1), n_vars))
             mapping = { i: new_indices[i-1] for i in range(1, n_vars+1) }
             trace = {
-                name: [
-                    [
-                        remap_trace_variables(log, n_vars, mapping) for log in logs]
-                        if isinstance(logs, list) 
+                name: (
+                    spec_trace if name == 'input_clauses' else [
+                        [
+                            remap_trace_variables(log, n_vars, mapping) for log in logs
+                        ] if isinstance(logs, list)
                         else remap_trace_variables(logs, n_vars, mapping)
                         for logs in spec_trace
                     ]
+                )
                 for name, spec_trace in trace.items()
             }
         traces.append(trace)
@@ -125,6 +127,7 @@ def main(args: argparse.Namespace) -> None:
     data = []
     for trace in tqdm(traces, desc="Writing to file..."):
         data_entry = {
+            "input_clauses": trace['input_clauses'],
             "solve_trace": '\n'.join(trace['solve_trace']),
             "solve_trace_with_subcalls": '\n'.join(trace['solve_trace_with_subcalls']),
             "unit_prop_traces": ['\n'.join(logs) for logs in trace['unit_prop_traces']],
