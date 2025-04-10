@@ -1,7 +1,7 @@
 import sys, os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from model.registry import CommandRegistry
+from src.model.registry import CommandRegistry
 from typing import Optional
 from tokenizers import Tokenizer
 
@@ -11,7 +11,7 @@ class CDCLScratchpad:
         self._saved_tokens_dict = {}
         self._saved_tokens_dict['level'] = []
 
-        in_clauses_tokens = tokenizer.encode(input_clauses)
+        in_clauses_tokens = tokenizer.encode(input_clauses).ids
         self._saved_tokens_dict['clauses'] = in_clauses_tokens
 
         self._read_begin_token = registry.read_block_markers[0]
@@ -37,10 +37,10 @@ class CDCLScratchpad:
 
     def apply(self, cmd: str, payload: list[int]) -> Optional[list[int]]:
         if cmd.startswith("READ"):
-            key = cmd.split('_')[1].lower()
+            key = '_'.join(cmd.split('_')[1:]).lower()
             return self._handle_read(key)
         elif cmd.startswith("WRITE"):
-            key = cmd.split('_')[1].lower()
+            key = '_'.join(cmd.split('_')[1:]).lower()
             fn = self._handlers[key]['write']
             if fn is None:
                 raise ValueError(f"Unknown WRITE command: {key}")
@@ -87,7 +87,10 @@ class CDCLScratchpad:
         return result
 
     def _backtrack(self):
-        backtrack_tokens = self._saved_tokens_dict.get("backtrack_level", [])
+        if "backtrack_level" not in self._saved_tokens_dict:
+            return
+
+        backtrack_tokens = self._saved_tokens_dict["backtrack_level"]
         backtrack_level = len(backtrack_tokens)
 
         decision_levels = self._saved_tokens_dict.get("decision_levels", [])

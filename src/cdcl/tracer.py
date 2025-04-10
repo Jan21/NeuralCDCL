@@ -56,7 +56,7 @@ class Tracer:
 
     def on_analyze_conflict_end(self, new_clause: list):
         trace = [
-            f"WRITE_LEARNED_CLAUSES_APPEND WRITE_BEGIN {format_list(new_clause, is_var=True)} WRITE_END",
+            f"WRITE_LEARNED_CLAUSES WRITE_BEGIN {format_list(new_clause, is_var=True)} WRITE_END",
         ]
         self.current_analyze_trace.extend(trace) 
 
@@ -97,9 +97,9 @@ class Tracer:
         ]
         if learned_literal is not None:
             trace = trace + [
-                f"WRITE_ASSIGNMENTS_APPEND WRITE_BEGIN {format_lit(learned_literal)} WRITE_END",
-                f"WRITE_DECISION_LEVELS_APPEND WRITE_BEGIN {encode_number_unary(level)} WRITE_END",
-                f"WRITE_REASON_CLAUSES_APPEND WRITE_BEGIN {format_list(clause, is_var=True)} WRITE_END",
+                f"WRITE_ASSIGNMENTS WRITE_BEGIN {format_lit(learned_literal)} WRITE_END",
+                f"WRITE_DECISION_LEVELS WRITE_BEGIN {encode_number_unary(level)} WRITE_END",
+                f"WRITE_REASON_CLAUSES WRITE_BEGIN {format_list(clause, is_var=True)} WRITE_END",
             ]
         self.current_unit_trace.extend(trace) 
 
@@ -157,9 +157,9 @@ class Tracer:
             trace = trace + ["SAT"] + ["SOLVE_END"]
         else:
             trace = trace + [
-                f"WRITE_ASSIGNMENTS_APPEND WRITE_BEGIN {format_lit(new_lit)} WRITE_END",
-                f"WRITE_DECISION_LEVELS_APPEND WRITE_BEGIN {encode_number_unary(level)} WRITE_END",
-                f"WRITE_REASON_CLAUSES_APPEND WRITE_BEGIN None WRITE_END",
+                f"WRITE_ASSIGNMENTS WRITE_BEGIN {format_lit(new_lit)} WRITE_END",
+                f"WRITE_DECISION_LEVELS WRITE_BEGIN {encode_number_unary(level)} WRITE_END",
+                f"WRITE_REASON_CLAUSES WRITE_BEGIN None WRITE_END",
                 f"LEVEL_UP"
             ]
         self.solve_trace.extend(trace) 

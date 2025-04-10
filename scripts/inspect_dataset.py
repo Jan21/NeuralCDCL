@@ -27,11 +27,11 @@ def plot_token_length_histogram(lengths, file_path: str, split="train"):
 
 @hydra.main(config_path="../config", config_name="config", version_base=None)
 def main(cfg: DictConfig):
-    with_subcalls = 'separated_subcalls' if cfg.data.separated_subcalls else ''
+    with_subcalls = '' if cfg.data.separated_subcalls else 'subcalls_united'
 
     tokenizer = Tokenizer.from_file(to_absolute_path(cfg.paths.tokenizer))
     pipeline = DatasetPipeline(cfg, tokenizer)
-    datasets = pipeline.build()
+    datasets = pipeline.build(filter_by_len=False)
 
     for split in datasets.keys():
         if split not in datasets:

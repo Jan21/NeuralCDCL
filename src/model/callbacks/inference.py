@@ -1,15 +1,15 @@
-import torch
 from tokenizers import Tokenizer
 from lightning.pytorch import Callback, Trainer
 from lightning.pytorch.core.module import LightningModule
 from typing import Optional
+import wandb
 
-from model.inference import InferenceRunner
-from cdcl.env import AutoregressiveCDCLEnvironment
-from dataset.dataset import CDCLDataset
-from model.registry import CommandRegistry
-from model.parser import CommandParser
-from src.cdcl_env.cdcl_scratchpad import CDCLScratchpad
+from src.cdcl.env import AutoregressiveCDCLEnvironment
+from src.data.dataset import CDCLDataset
+from src.model.registry import CommandRegistry
+from src.model.parser import CommandParser
+from src.cdcl.scratchpad import CDCLScratchpad
+from src.model.inference import InferenceRunner
 
 
 class InferenceCallback(Callback):
@@ -35,43 +35,44 @@ class InferenceCallback(Callback):
         self._resample_each_time = resample_each_time
 
         if not resample_each_time:
-            self._fixed_samples = self._dataset.sample_by_type('solve', self._sample_count, seed=self._seed)
+            self._fixed_samples = self._dataset.sample_solve_traces(self._sample_count, seed=self._seed)
                 
     def on_validation_epoch_end(self, trainer: Trainer, pl_module: LightningModule):
         if self._fixed_samples is None:
-            samples = self._dataset.sample_by_type('solve', self._sample_count, seed=self._seed)
+            samples = self._dataset.sample_solve_traces(self._sample_count, seed=self._seed)
         else:
             samples = self._fixed_samples
 
         correct = 0
-        total = 0
-
         pl_module.eval()
         runner = InferenceRunner(pl_module)
 
-        for trace_type in self.trace_types:
-            for sample in samples[trace_type]:
-                input_clauses_str, full_trace_tokenized = sample
-                label = full_trace_tokenized["input_ids"].tolist()
+        for sample in samples:
+            input_clauses_str, full_trace_tokenized = sample
+            label = full_trace_tokenized["input_ids"].tolist()
 
-                # setup environment
-                scratchpad = CDCLScratchpad(input_clauses_str, self._tokenizer, self._registry)
-                command_parser = CommandParser(self._registry)
-                env = AutoregressiveCDCLEnvironment(self._registry, scratchpad, command_parser)
+            # setup environment
+            scratchpad = CDCLScratchpad(input_clauses_str, self._tokenizer, self._registry)
+            command_parser = CommandParser(self._registry)
+            env = AutoregressiveCDCLEnvironment(self._registry, scratchpad, command_parser)
 
-                generated_ids = runner.run(env, self._max_steps)
+            generated_ids = runner.run(env, self._max_steps, label)
 
             if self._is_correct(generated_ids, label):
                 correct += 1
-            total += 1
 
+        total = len(samples)
         acc = correct / total if total > 0 else 0.0
+
+        last_generated_str = self._tokenizer.decode(generated_ids)
+        last_label_str = self._tokenizer.decode(label)
         trainer.logger.log_metrics({f"{self._dataset_name}_accuracy": acc}, step=trainer.global_step)
         trainer.logger.experiment.log({
-            "example/generated": self._tokenizer.decode(generated_ids),
-            "example/expected": self._tokenizer.decode(label),
-            "step": trainer.global_step
-        })
+            f"inference/{self._dataset_name}/example": wandb.Html(
+                f"<b>Generated:</b><br><p>{last_generated_str}</p>"
+                f"<br><b>Label:</b><br><p>{last_label_str}</p>"
+            )
+        }, step=trainer.global_step)
 
     def _is_correct(self, generated: list[int], expected: list[int]) -> bool:
         """

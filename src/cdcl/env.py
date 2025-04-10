@@ -1,6 +1,6 @@
-from model.registry import CommandRegistry
-from src.cdcl_env.cdcl_scratchpad import CDCLScratchpad
-from model.parser import CommandParser
+from src.model.registry import CommandRegistry
+from src.cdcl.scratchpad import CDCLScratchpad
+from src.model.parser import CommandParser
 
 
 class AutoregressiveCDCLEnvironment:

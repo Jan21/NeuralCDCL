@@ -1,4 +1,4 @@
-from model.registry import CommandRegistry
+from src.model.registry import CommandRegistry
 from typing import Optional
 
 
@@ -17,9 +17,6 @@ class CommandParser:
             **{v: k for k, v in registry.read_cmd_tokens.items()},
             **{v: k for k, v in registry.write_cmd_tokens.items()},
             **{v: k for k, v in registry.action_cmd_tokens.items()},
-            **{v: k for k, v in registry.solve_block_markers.items()},
-            **{v: k for k, v in registry.up_block_markers.items()},
-            **{v: k for k, v in registry.ac_block_markers.items()},
         }
 
     def reset(self):

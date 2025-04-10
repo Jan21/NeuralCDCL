@@ -9,12 +9,11 @@ hydra:
     dir: .
 
 general:
-  project: "SAT"
-  run_name: > 
-    ${now:%Y-%m-%d_%H-%M-%S}-pythia-${train.model.n_layer}x${train.model.n_head}x${train.model.n_embd}
-    _bs${train.trainer.batch_size}_ctx${train.model.block_size}
-    _subs=${data.separated_subcalls}
+  project: "SAT_LLM"
+  run_name: >
+    ${now:%Y%m%d_%H%M%S}-GPT-${train.model.n_layer}x${train.model.n_head}x${train.model.n_embd}_bs${train.trainer.batch_size}_ctx${train.model.block_size}_subs${data.separated_subcalls}
   devices: [0]
+  seed: 21
 
 paths:
   root_dir: "runs/${general.run_name}"
@@ -29,9 +28,9 @@ data:
   files:
     train: "${paths.data}/cdcl_data_train.json"
     val: "${paths.data}/cdcl_data_val.json"
-    test: "${paths.data}/cdcl_data_test.json"
-    ood: "${paths.data}/cdcl_data_ood.json"
-  num_workers: 96
+    # test: "${paths.data}/cdcl_data_test.json"
+    # ood: "${paths.data}/cdcl_data_ood.json"
+  num_workers: 4
   tokenize_batch_size: 256
   special_tokens:
     read_block_markers: ["READ_BEGIN", "READ_END"]
@@ -45,10 +44,10 @@ data:
       - "READ_LEVEL"
     write_block_markers: ["WRITE_BEGIN", "WRITE_END"]
     write_cmd_tokens:
-      - "WRITE_ASSIGNMENTS_APPEND"
-      - "WRITE_REASON_CLAUSES_APPEND"
-      - "WRITE_DECISION_LEVELS_APPEND"
-      - "WRITE_LEARNED_CLAUSES_APPEND"
+      - "WRITE_ASSIGNMENTS"
+      - "WRITE_REASON_CLAUSES"
+      - "WRITE_DECISION_LEVELS"
+      - "WRITE_LEARNED_CLAUSES"
       - "WRITE_BACKTRACK_LEVEL"
       - "WRITE_CONFLICT_CLAUSE"
     action_cmd_tokens: ["BACKTRACK", "LEVEL_UP", "CALL_UNIT_PROPAGATION", "CALL_ANALYZE_CONFLICT"]
@@ -62,15 +61,19 @@ data:
 
 train:
   trainer:
-    batch_size: 32
+    batch_size: 2
     accumulate_grad_batches: 2
     epochs: 5
 
   model:
-    n_layer: 6
-    n_head: 8
-    n_embd: 512
-    block_size: 1250
+    # n_layer: 6
+    # n_head: 8
+    # n_embd: 512
+    # block_size: 1250
+    n_layer: 1
+    n_head: 2
+    n_embd: 64
+    block_size: 512
 
   optimizer:
     warmup_steps: 500
