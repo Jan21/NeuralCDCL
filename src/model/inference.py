@@ -8,7 +8,7 @@ class InferenceRunner:
         self.model = model
         self.temperature = temperature
 
-    def run(self, env: AutoregressiveCDCLEnvironment, max_steps: int, label) -> list[int]:
+    def run(self, env: AutoregressiveCDCLEnvironment, max_steps: int) -> list[int]:
         for _ in range(max_steps):
             current_input = env.get_current_input()
             if len(current_input) > self.model.block_size:
@@ -21,8 +21,6 @@ class InferenceRunner:
             # Apply temperature + sample next token
             probs = torch.nn.functional.softmax(logits / self.temperature, dim=-1)
             next_token = torch.multinomial(probs, num_samples=1).item()
-
-            next_token = label[len(current_input)] if len(current_input) < len(label) else 25
 
             # Let environment process it
             env.append(next_token)

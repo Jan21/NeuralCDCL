@@ -6,6 +6,8 @@ class CommandRegistry:
     def __init__(self, cfg: DictConfig, tokenizer: Tokenizer):
         spec = cfg.data.special_tokens
 
+        self.pad_token = tokenizer.token_to_id("[PAD]")
+
         # Command token mappings
         self.read_cmd_tokens = {tok: tokenizer.token_to_id(tok) for tok in spec.read_cmd_tokens}
         self.write_cmd_tokens = {tok: tokenizer.token_to_id(tok) for tok in spec.write_cmd_tokens}

@@ -205,7 +205,7 @@ class Tracer:
 
     def get_trace(self) -> list[str]:
         return {
-            'input_clauses': self.input_clauses_trace,
+            'input_clauses': [self.input_clauses_trace],
             'solve_trace': self.solve_trace, 
             'solve_trace_with_subcalls': self.get_solve_trace_with_subcalls(), 
             'unit_prop_traces': self.unit_propagation_traces,

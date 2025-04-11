@@ -16,7 +16,7 @@ from lightning.pytorch.callbacks import ModelCheckpoint, LearningRateMonitor
 
 import random
 from tokenizers import Tokenizer
-from src.data.pipeline import DatasetPipeline
+from src.dataset.pipeline import DatasetPipeline
 from src.model.registry import CommandRegistry
 from src.model.callbacks.eval_loss import EvalLossCallback
 from src.model.callbacks.inference import InferenceCallback
@@ -37,7 +37,7 @@ def main(cfg: DictConfig):
     registry = CommandRegistry(cfg, tokenizer)
 
     # Data.
-    pipeline = DatasetPipeline(cfg, tokenizer)
+    pipeline = DatasetPipeline(cfg, tokenizer, registry)
     datasets = pipeline.build()
     dataloaders = pipeline.build_dataloaders(datasets)
 
@@ -70,8 +70,8 @@ def main(cfg: DictConfig):
     )
     lr_monitor_callback = LearningRateMonitor(logging_interval="step")
     # ood_eval_loss_callback = EvalLossCallback(dataloaders['ood'], 'ood', F.cross_entropy, eval_every_n_steps=100)
-    inference_val_callback = InferenceCallback(datasets['val'], 'val', registry, tokenizer, max_steps=1000, sample_count=20, resample_each_time=False, seed=42)
-    # inference_ood_callback = InferenceCallback(datasets['ood'], 'ood', registry, tokenizer, max_steps=500, sample_count=20, resample_each_time=False, seed=42)
+    inference_val_callback = InferenceCallback(datasets['val'], 'val', registry, tokenizer, max_steps=1000, sample_count=20, resample_each_time=False)
+    # inference_ood_callback = InferenceCallback(datasets['ood'], 'ood', registry, tokenizer, max_steps=500, sample_count=20, resample_each_time=False)
 
     trainer = L.Trainer(
         # accelerator="cuda",

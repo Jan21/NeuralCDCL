@@ -5,7 +5,7 @@ from typing import Optional
 import wandb
 
 from src.cdcl.env import AutoregressiveCDCLEnvironment
-from src.data.dataset import CDCLDataset
+from src.dataset.dataset import CDCLDataset
 from src.model.registry import CommandRegistry
 from src.model.parser import CommandParser
 from src.cdcl.scratchpad import CDCLScratchpad
@@ -14,8 +14,7 @@ from src.model.inference import InferenceRunner
 
 class InferenceCallback(Callback):
     def __init__(self, dataset: CDCLDataset, dataset_name: str, registry: CommandRegistry, tokenizer: Tokenizer,
-                 max_steps: int, sample_count: int, resample_each_time: bool, 
-                 seed: Optional[int] = None):
+                 max_steps: int, sample_count: int, resample_each_time: bool):
         """
         Args:
             dataset: The dataset to sample from.
@@ -31,15 +30,14 @@ class InferenceCallback(Callback):
         self._max_steps = max_steps
         self._sample_count = sample_count
         self._fixed_samples = None
-        self._seed = seed if seed else 43
         self._resample_each_time = resample_each_time
 
         if not resample_each_time:
-            self._fixed_samples = self._dataset.sample_solve_traces(self._sample_count, seed=self._seed)
+            self._fixed_samples = self._dataset.sample_solve_traces(self._sample_count)
                 
     def on_validation_epoch_end(self, trainer: Trainer, pl_module: LightningModule):
         if self._fixed_samples is None:
-            samples = self._dataset.sample_solve_traces(self._sample_count, seed=self._seed)
+            samples = self._dataset.sample_solve_traces(self._sample_count)
         else:
             samples = self._fixed_samples
 
@@ -48,24 +46,28 @@ class InferenceCallback(Callback):
         runner = InferenceRunner(pl_module)
 
         for sample in samples:
-            input_clauses_str, full_trace_tokenized = sample
-            label = full_trace_tokenized["input_ids"].tolist()
+
+            input_clauses_tokens = sample.input_clauses["input_ids"]
+            label_tokens = sample.compose(
+                self._registry.action_cmd_tokens["CALL_UNIT_PROPAGATION"],
+                self._registry.action_cmd_tokens["CALL_ANALYZE_CONFLICT"]
+            )
 
             # setup environment
-            scratchpad = CDCLScratchpad(input_clauses_str, self._tokenizer, self._registry)
+            scratchpad = CDCLScratchpad(input_clauses_tokens, self._tokenizer, self._registry)
             command_parser = CommandParser(self._registry)
             env = AutoregressiveCDCLEnvironment(self._registry, scratchpad, command_parser)
 
-            generated_ids = runner.run(env, self._max_steps, label)
+            generated_ids = runner.run(env, self._max_steps, label_tokens)
 
-            if self._is_correct(generated_ids, label):
+            if self._is_correct(generated_ids, label_tokens):
                 correct += 1
 
         total = len(samples)
         acc = correct / total if total > 0 else 0.0
 
-        last_generated_str = self._tokenizer.decode(generated_ids)
-        last_label_str = self._tokenizer.decode(label)
+        last_generated_str = self._tokenizer.decode(generated_ids, skip_special_tokens=False)
+        last_label_str = self._tokenizer.decode(label_tokens, skip_special_tokens=False)
         trainer.logger.log_metrics({f"{self._dataset_name}_accuracy": acc}, step=trainer.global_step)
         trainer.logger.experiment.log({
             f"inference/{self._dataset_name}/example": wandb.Html(

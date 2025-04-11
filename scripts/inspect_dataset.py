@@ -5,7 +5,8 @@ import matplotlib.pyplot as plt
 from omegaconf import DictConfig
 import hydra
 from hydra.utils import to_absolute_path
-from src.data.pipeline import DatasetPipeline
+from src.dataset.pipeline import DatasetPipeline
+from src.model.registry import CommandRegistry
 from tokenizers import Tokenizer
 
 
@@ -27,10 +28,9 @@ def plot_token_length_histogram(lengths, file_path: str, split="train"):
 
 @hydra.main(config_path="../config", config_name="config", version_base=None)
 def main(cfg: DictConfig):
-    with_subcalls = '' if cfg.data.separated_subcalls else 'subcalls_united'
-
     tokenizer = Tokenizer.from_file(to_absolute_path(cfg.paths.tokenizer))
-    pipeline = DatasetPipeline(cfg, tokenizer)
+    registry = CommandRegistry(cfg, tokenizer)
+    pipeline = DatasetPipeline(cfg, tokenizer, registry)
     datasets = pipeline.build(filter_by_len=False)
 
     for split in datasets.keys():
@@ -58,7 +58,7 @@ def main(cfg: DictConfig):
 
         lengths = compute_token_lengths(datasets[split])
         print(f"[{split.upper()}] Mean: {sum(lengths) / len(lengths):.2f}, Min: {min(lengths)}, Max: {max(lengths)}")
-        file_path = to_absolute_path(os.path.join(cfg.paths.data, f"token_lengths_{split}_{with_subcalls}.png"))
+        file_path = to_absolute_path(os.path.join(cfg.paths.data, f"token_lengths_{split}.png"))
         plot_token_length_histogram(lengths, file_path, split=split)
 
 

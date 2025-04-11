@@ -19,6 +19,9 @@ class AutoregressiveCDCLEnvironment:
         self._ac_end = self._registry.ac_block_markers[1]
         self._solve_end = self._registry.solve_block_markers[1]
 
+        self._call_up = self._registry.action_cmd_tokens["CALL_UNIT_PROPAGATION"]
+        self._call_ac = self._registry.action_cmd_tokens["CALL_ANALYZE_CONFLICT"]
+
     def append(self, token: int):
         """
         Process a single token emitted by the model. Returns the current input to feed back.
@@ -35,8 +38,10 @@ class AutoregressiveCDCLEnvironment:
                 self._history.extend(response)  # Inline injection of READ response
 
         # Handle UNIT_PROPAGATION / ANALYZE_CONFLICT switching
-        if token in [self._unit_prop_begin, self._ac_begin]:
-            self._stash_and_reset(token)
+        if token == self._call_up:
+            self._stash_and_reset(self._unit_prop_begin)
+        elif token == self._call_ac:
+            self._stash_and_reset(self._ac_begin)
         elif token in [self._unit_prop_end, self._ac_end]:
             self._restore_history()
 

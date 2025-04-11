@@ -11,7 +11,7 @@ hydra:
 general:
   project: "SAT_LLM"
   run_name: >
-    ${now:%Y%m%d_%H%M%S}-GPT-${train.model.n_layer}x${train.model.n_head}x${train.model.n_embd}_bs${train.trainer.batch_size}_ctx${train.model.block_size}_subs${data.separated_subcalls}
+    ${now:%Y%m%d_%H%M%S}-GPT-${train.model.n_layer}x${train.model.n_head}x${train.model.n_embd}_bs${train.trainer.batch_size}_ctx${train.model.block_size}
   devices: [0]
   seed: 21
 
@@ -24,7 +24,6 @@ paths:
   data: "data"
 
 data:
-  separated_subcalls: True
   files:
     train: "${paths.data}/cdcl_data_train.json"
     val: "${paths.data}/cdcl_data_val.json"
@@ -81,11 +80,11 @@ train:
     weight_decay: 0.01
     betas: [0.9, 0.999]
 
-eval:
-  num_examples: 128
-  batch_size: 32
-  eval_interval: 10
-  log_step_frequency: 50
-  val_check_interval: 0.1
-  callback_epoch_frequency: 1
-  callback_acc_data_count: 200
+# eval:
+#   num_examples: 128
+#   batch_size: 32
+#   eval_interval: 10
+#   log_step_frequency: 50
+#   val_check_interval: 0.1
+#   callback_epoch_frequency: 1
+#   callback_acc_data_count: 200
