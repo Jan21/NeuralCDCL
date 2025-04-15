@@ -37,8 +37,8 @@ class CDCLSolver:
                 value = random.choice([True, False])
                 lit = var if value else -var
                 # self.assign(var, True, None)
-                self.tracer.on_solve_conflict_not_found(self.assignments, n_vars, n_assigned_vars, False, lit, self.level)
                 self.level += 1
+                self.tracer.on_solve_conflict_not_found(self.assignments, n_vars, n_assigned_vars, False, lit, self.level)
                 self.assign(var, value, None)
 
     def unit_propagate(self,):

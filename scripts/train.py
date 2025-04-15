@@ -12,7 +12,7 @@ from omegaconf import DictConfig, OmegaConf
 from litgpt.config import Config
 from litgpt.model import GPT
 from litgpt.api import Preprocessor
-from lightning.pytorch.callbacks import ModelCheckpoint, LearningRateMonitor
+from lightning.pytorch.callbacks import ModelCheckpoint
 
 import random
 from tokenizers import Tokenizer
@@ -28,6 +28,11 @@ from src.model.lit_wrapper import LitWrapper
 
 @hydra.main(config_path="../config", config_name="config", version_base=None)
 def main(cfg: DictConfig):
+    # Save config.
+    config_path = to_absolute_path(cfg.paths.config_export)
+    os.makedirs(os.path.dirname(config_path), exist_ok=True)
+    OmegaConf.save(cfg, config_path)
+
     # For reproducibility.
     random.seed(cfg.general.seed)
     torch.manual_seed(cfg.general.seed)
@@ -61,36 +66,35 @@ def main(cfg: DictConfig):
 
     # Trainer configuration.
     checkpoint_callback = ModelCheckpoint(
-        monitor="val_loss",
+        monitor="val/loss",
         save_top_k=1,
         mode="min",
         save_last=True,
         dirpath=cfg.paths.checkpoint_dir,
         filename="best"
     )
-    lr_monitor_callback = LearningRateMonitor(logging_interval="step")
-    # ood_eval_loss_callback = EvalLossCallback(dataloaders['ood'], 'ood', F.cross_entropy, eval_every_n_steps=100)
-    inference_val_callback = InferenceCallback(datasets['val'], 'val', registry, tokenizer, max_steps=1000, sample_count=20, resample_each_time=False)
-    # inference_ood_callback = InferenceCallback(datasets['ood'], 'ood', registry, tokenizer, max_steps=500, sample_count=20, resample_each_time=False)
+    ood_eval_loss_callback = EvalLossCallback(dataloaders['ood'], 'ood', F.cross_entropy, loss_name="loss")
+    val_inference_callback = InferenceCallback(datasets['val'], 'val', registry, tokenizer, max_steps=cfg['train']['callbacks']['inference_max_steps'], 
+                                               sample_size=cfg['train']['callbacks']['inference_sample_size'], resample_each_time=False)
+    ood_inference_callback = InferenceCallback(datasets['ood'], 'ood', registry, tokenizer, max_steps=cfg['train']['callbacks']['inference_max_steps'], 
+                                               sample_size=cfg['train']['callbacks']['inference_sample_size'], resample_each_time=False)
 
     trainer = L.Trainer(
-        # accelerator="cuda",
-        # devices=cfg.general.devices,
-        accelerator="cpu",
+        accelerator="cuda",
+        devices=cfg.general.devices,
         devices=1,
         max_epochs=cfg.train.trainer.epochs,
         accumulate_grad_batches=cfg.train.trainer.accumulate_grad_batches,
         precision="16-mixed",
-        val_check_interval=100,
+        val_check_interval=cfg['train']['callbacks']['val_check_interval'],
         callbacks=[
             checkpoint_callback,
-            lr_monitor_callback,
-            # ood_eval_loss_callback,
-            inference_val_callback,
-            # inference_ood_callback
+            ood_eval_loss_callback,
+            val_inference_callback,
+            ood_inference_callback,
         ],
         logger=logger,
-        log_every_n_steps=10
+        log_every_n_steps=cfg['train']['callbacks']['train_log_every_n_steps']
     )
 
     trainer.fit(

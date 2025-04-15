@@ -10,8 +10,7 @@ hydra:
 
 general:
   project: "SAT_LLM"
-  run_name: >
-    ${now:%Y%m%d_%H%M%S}-GPT-${train.model.n_layer}x${train.model.n_head}x${train.model.n_embd}_bs${train.trainer.batch_size}_ctx${train.model.block_size}
+  run_name: "${now:%Y%m%d_%H%M%S}-GPT-${train.model.n_layer}x${train.model.n_head}x${train.model.n_embd}_bs${train.trainer.batch_size}_ctx${train.model.block_size}"
   devices: [0]
   seed: 21
 
@@ -27,9 +26,9 @@ data:
   files:
     train: "${paths.data}/cdcl_data_train.json"
     val: "${paths.data}/cdcl_data_val.json"
-    # test: "${paths.data}/cdcl_data_test.json"
-    # ood: "${paths.data}/cdcl_data_ood.json"
-  num_workers: 4
+    test: "${paths.data}/cdcl_data_test.json"
+    ood: "${paths.data}/cdcl_data_ood.json"
+  num_workers: 96
   tokenize_batch_size: 256
   special_tokens:
     read_block_markers: ["READ_BEGIN", "READ_END"]
@@ -59,32 +58,25 @@ data:
     unsat_token: "UNSAT"
 
 train:
+  callbacks:
+    inference_sample_size: 50 
+    inference_max_steps: 8192
+    val_check_interval: 0.5
+    train_log_every_n_steps: 20
+
   trainer:
-    batch_size: 2
+    batch_size: 8
     accumulate_grad_batches: 2
-    epochs: 5
+    epochs: 25
 
   model:
-    # n_layer: 6
-    # n_head: 8
-    # n_embd: 512
-    # block_size: 1250
-    n_layer: 1
-    n_head: 2
-    n_embd: 64
-    block_size: 512
+    n_layer: 6
+    n_head: 8
+    n_embd: 512
+    block_size: 2048
 
   optimizer:
-    warmup_steps: 500
+    warmup_steps: 1000
     lr: 1e-4
     weight_decay: 0.01
     betas: [0.9, 0.999]
-
-# eval:
-#   num_examples: 128
-#   batch_size: 32
-#   eval_interval: 10
-#   log_step_frequency: 50
-#   val_check_interval: 0.1
-#   callback_epoch_frequency: 1
-#   callback_acc_data_count: 200

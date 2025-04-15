@@ -1,11 +1,23 @@
 import sys, os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+import random
+import numpy as np
+import torch
+
 import pytest
 import copy
 from tokenizers import Tokenizer
 from omegaconf import OmegaConf
 from src.model.registry import CommandRegistry
+
+
+def pytest_configure(config):
+    seed = int(config.getoption("seed"))
+    print(f"Using seed: {seed}")
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
 
 # -------------------------------------------------------------------
 # CLI option: --tokenizer-path (relative to project root)
@@ -28,6 +40,12 @@ def pytest_addoption(parser):
         action="store",
         default="tests/testdata/cdcl_data_tiny.json",
         help="Path to the small cdcl data used for testing (relative to project root)"
+    )
+    parser.addoption(
+        "--seed",
+        action="store",
+        default="42",
+        help="Random seed for reproducibility"
     )
 
 # -------------------------------------------------------------------

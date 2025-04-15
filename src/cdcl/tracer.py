@@ -135,7 +135,7 @@ class Tracer:
         if not is_unsat:
             trace = trace + [f"CALL_ANALYZE_CONFLICT"]
         else:
-            trace = trace + [f"SOLVE_END"]
+            trace = trace + ["UNSAT", f"SOLVE_END"]
 
         self.solve_trace.extend(trace) 
 

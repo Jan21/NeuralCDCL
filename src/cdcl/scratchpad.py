@@ -84,7 +84,7 @@ class CDCLScratchpad:
         return result
 
     def _backtrack(self):
-        if "backtrack_level" not in self._saved_tokens_dict:
+        if "backtrack_level" not in self._saved_tokens_dict or "conflict_clause" not in self._saved_tokens_dict:
             return
 
         backtrack_tokens = self._saved_tokens_dict["backtrack_level"]
