@@ -28,7 +28,7 @@ data:
     val: "${paths.data}/cdcl_data_val.json"
     test: "${paths.data}/cdcl_data_test.json"
     ood: "${paths.data}/cdcl_data_ood.json"
-  num_workers: 96
+  num_workers: 1
   tokenize_batch_size: 256
   special_tokens:
     read_block_markers: ["READ_BEGIN", "READ_END"]
@@ -59,21 +59,25 @@ data:
 
 train:
   callbacks:
-    inference_sample_size: 50 
-    inference_max_steps: 8192
+    inference_sample_size: 5
+    inference_max_steps: 3000
     val_check_interval: 0.5
     train_log_every_n_steps: 20
 
   trainer:
-    batch_size: 8
+    batch_size: 1
     accumulate_grad_batches: 2
-    epochs: 25
+    epochs: 5
 
   model:
-    n_layer: 6
-    n_head: 8
-    n_embd: 512
-    block_size: 2048
+    n_layer: 1
+    n_head: 2
+    n_embd: 128
+    block_size: 1024
+    # n_layer: 6
+    # n_head: 8
+    # n_embd: 512
+    # block_size: 2048
 
   optimizer:
     warmup_steps: 1000

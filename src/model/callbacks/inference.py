@@ -18,9 +18,9 @@ class InferenceCallback(Callback):
         """
         Args:
             dataset: The dataset to sample from.
-            dataset_name: Used for logging metrics.
+            dataset_name: Used for logging outputs.
             max_steps: Max generation steps for inference.
-            sample_size: Number of examples to evaluate per trace type.
+            sample_size: Number of examples to evaluate per epoch.
             resample_each_time: If True, resample each validation epoch; otherwise, fix samples once.
             eval_every_n_epochs: Frequency of evaluation.
         """
@@ -30,56 +30,45 @@ class InferenceCallback(Callback):
         self._tokenizer = tokenizer
         self._max_steps = max_steps
         self._sample_size = sample_size
-        self._fixed_samples = None
         self._resample_each_time = resample_each_time
         self._eval_every_n_epochs = eval_every_n_epochs
+        self._fixed_samples = None
 
         if not resample_each_time:
-            self._fixed_samples = self._dataset.sample_solve_traces(self._sample_size)
-                
+            self._fixed_samples = self._dataset.sample_full_traces(self._sample_size)
+
     def on_train_epoch_end(self, trainer: Trainer, pl_module: LightningModule, *_):
-        if trainer.current_epoch % self._eval_every_n_epochs == 0:
-            if self._fixed_samples is None:
-                samples = self._dataset.sample_solve_traces(self._sample_size)
-            else:
-                samples = self._fixed_samples
+        if trainer.current_epoch % self._eval_every_n_epochs != 0:
+            return
 
-            correct = 0
-            pl_module.eval()
-            runner = InferenceRunner(pl_module)
+        samples = (
+            self._dataset.sample_full_traces(self._sample_size)
+            if self._resample_each_time or self._fixed_samples is None
+            else self._fixed_samples
+        )
 
-            for sample in samples:
-                label_tokens = sample.solve["input_ids"]
-                input_clauses_tokens = sample.input_clauses["input_ids"]
+        pl_module.eval()
+        runner = InferenceRunner(pl_module)
 
-                # setup environment
-                scratchpad = CDCLScratchpad(input_clauses_tokens, self._registry)
-                command_parser = CommandParser(self._registry)
-                env = AutoregressiveCDCLEnvironment(self._registry, scratchpad, command_parser)
+        for i, sample in enumerate(samples):
+            label_tokens = sample.solve["input_ids"]
+            input_clauses_tokens = sample.input_clauses["input_ids"]
 
-                with torch.no_grad():
-                    generated_ids = runner.run(env, self._max_steps)
-                
-                if self._is_correct(generated_ids, label_tokens):
-                    correct += 1
+            scratchpad = CDCLScratchpad(input_clauses_tokens, self._registry)
+            command_parser = CommandParser(self._registry)
+            env = AutoregressiveCDCLEnvironment(self._registry, scratchpad, command_parser)
 
-            total = len(samples)
-            acc = correct / total if total > 0 else 0.0
-            pl_module.log(f"inference/{self._dataset_name}/accuracy", acc, prog_bar=False, on_step=False, on_epoch=True)
+            with torch.no_grad():
+                generated_ids = runner.run(env, self._max_steps)
 
-            last_generated_str = self._tokenizer.decode(generated_ids, skip_special_tokens=False)
-            last_label_str = self._tokenizer.decode(label_tokens, skip_special_tokens=False)
+            generated_text = self._tokenizer.decode(generated_ids, skip_special_tokens=False)
+            label_text = self._tokenizer.decode(label_tokens, skip_special_tokens=False)
+
             trainer.logger.experiment.log({
-                f"inference/{self._dataset_name}/example": wandb.Html(
-                    f"<b>Generated:</b><br><p>{last_generated_str}</p>"
-                    f"<br><b>Label:</b><br><p>{last_label_str}</p>"
+                f"inference/{self._dataset_name}/example_{i}": wandb.Html(
+                    f"<b>Generated:</b><br><p>{generated_text}</p>"
+                    f"<br><b>Label:</b><br><p>{label_text}</p>"
                 )
-            })
-            pl_module.train()
+            }, step=trainer.global_step)
 
-    def _is_correct(self, generated: list[int], expected: list[int]) -> bool:
-        """
-        A trace is considered correct if:
-        - The second-to-last token in the sequence matches the expected one.
-        """
-        return generated[-2] == expected[-2]
+        pl_module.train()

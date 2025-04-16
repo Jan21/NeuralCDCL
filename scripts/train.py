@@ -18,7 +18,7 @@ import random
 from tokenizers import Tokenizer
 from src.dataset.pipeline import DatasetPipeline
 from src.model.registry import CommandRegistry
-from src.model.callbacks.eval_loss import EvalLossCallback
+from src.model.callbacks.eval import EvalCallback
 from src.model.callbacks.inference import InferenceCallback
 from src.model.lit_wrapper import LitWrapper
 
@@ -73,15 +73,17 @@ def main(cfg: DictConfig):
         dirpath=cfg.paths.checkpoint_dir,
         filename="best"
     )
-    ood_eval_loss_callback = EvalLossCallback(dataloaders['ood'], 'ood', F.cross_entropy, loss_name="loss")
+    val_eval_loss_callback = EvalCallback(dataloaders['val'], 'val', registry)
+    ood_eval_loss_callback = EvalCallback(dataloaders['ood'], 'ood', registry)
     val_inference_callback = InferenceCallback(datasets['val'], 'val', registry, tokenizer, max_steps=cfg['train']['callbacks']['inference_max_steps'], 
                                                sample_size=cfg['train']['callbacks']['inference_sample_size'], resample_each_time=False)
     ood_inference_callback = InferenceCallback(datasets['ood'], 'ood', registry, tokenizer, max_steps=cfg['train']['callbacks']['inference_max_steps'], 
                                                sample_size=cfg['train']['callbacks']['inference_sample_size'], resample_each_time=False)
 
     trainer = L.Trainer(
-        accelerator="cuda",
-        devices=cfg.general.devices,
+        # accelerator="cuda",
+        # devices=cfg.general.devices,
+        accelerator='cpu',
         devices=1,
         max_epochs=cfg.train.trainer.epochs,
         accumulate_grad_batches=cfg.train.trainer.accumulate_grad_batches,
@@ -89,6 +91,7 @@ def main(cfg: DictConfig):
         val_check_interval=cfg['train']['callbacks']['val_check_interval'],
         callbacks=[
             checkpoint_callback,
+            val_eval_loss_callback,
             ood_eval_loss_callback,
             val_inference_callback,
             ood_inference_callback,

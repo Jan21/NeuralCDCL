@@ -63,7 +63,7 @@ class CDCLDataset(Dataset):
 
         return {k: torch.tensor(v) for k, v in trace.items()}
 
-    def sample_solve_traces(self, n: int) -> list[TokenizedTraceExample]:
+    def sample_full_traces(self, n: int) -> list[TokenizedTraceExample]:
         """
         Randomly samples up to `n` solve traces with their corresponding input_clauses and tokenized data.
         """

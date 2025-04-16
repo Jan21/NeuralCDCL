@@ -1,0 +1,85 @@
+general:
+  project: SAT_LLM
+  run_name: ${now:%Y%m%d_%H%M%S}-GPT-${train.model.n_layer}x${train.model.n_head}x${train.model.n_embd}_bs${train.trainer.batch_size}_ctx${train.model.block_size}
+  devices:
+  - 0
+  seed: 21
+paths:
+  root_dir: runs/${general.run_name}
+  checkpoint_dir: ${paths.root_dir}/checkpoints
+  eval_results: ${paths.root_dir}/eval_results
+  config_export: ${paths.root_dir}/config.yaml
+  tokenizer: tokenizer/tokenizer.json
+  data: data
+data:
+  files:
+    train: ${paths.data}/cdcl_data_train.json
+    val: ${paths.data}/cdcl_data_val.json
+    test: ${paths.data}/cdcl_data_test.json
+    ood: ${paths.data}/cdcl_data_ood.json
+  num_workers: 1
+  tokenize_batch_size: 256
+  special_tokens:
+    read_block_markers:
+    - READ_BEGIN
+    - READ_END
+    read_cmd_tokens:
+    - READ_ASSIGNMENTS
+    - READ_CLAUSES
+    - READ_LEARNED_CLAUSES
+    - READ_DECISION_LEVELS
+    - READ_REASON_CLAUSES
+    - READ_CONFLICT_CLAUSE
+    - READ_LEVEL
+    write_block_markers:
+    - WRITE_BEGIN
+    - WRITE_END
+    write_cmd_tokens:
+    - WRITE_ASSIGNMENTS
+    - WRITE_REASON_CLAUSES
+    - WRITE_DECISION_LEVELS
+    - WRITE_LEARNED_CLAUSES
+    - WRITE_BACKTRACK_LEVEL
+    - WRITE_CONFLICT_CLAUSE
+    action_cmd_tokens:
+    - BACKTRACK
+    - LEVEL_UP
+    - CALL_UNIT_PROPAGATION
+    - CALL_ANALYZE_CONFLICT
+    solve_markers:
+    - SOLVE_BEGIN
+    - SOLVE_END
+    unit_prop_markers:
+    - UNIT_PROPAGATION_BEGIN
+    - UNIT_PROPAGATION_END
+    analyze_conflict_markers:
+    - ANALYZE_CONFLICT_BEGIN
+    - ANALYZE_CONFLICT_END
+    semantic_markers:
+    - '['
+    - ']'
+    counter_unit_token: I
+    sat_token: SAT
+    unsat_token: UNSAT
+train:
+  callbacks:
+    inference_sample_size: 5
+    inference_max_steps: 3000
+    val_check_interval: 0.5
+    train_log_every_n_steps: 20
+  trainer:
+    batch_size: 1
+    accumulate_grad_batches: 2
+    epochs: 5
+  model:
+    n_layer: 1
+    n_head: 2
+    n_embd: 128
+    block_size: 512
+  optimizer:
+    warmup_steps: 1000
+    lr: 0.0001
+    weight_decay: 0.01
+    betas:
+    - 0.9
+    - 0.999
