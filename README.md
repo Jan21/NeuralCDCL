@@ -29,9 +29,11 @@ Use the following script to create the training and evaluation datasets:
 python3 ./scripts/generate_data.py --n_vars_range 5 15 --num_formulas 100000 --remap_variables 25 --output_file ./data/cdcl_data_train.json
 ```
 
-- For training: 100k samples, variable range 5–15, remap to 25.
-- For validation and test: same setup, but with 10k samples.
-- For OOD eval: 5k samples, variable range 16–25.
+- For training: 100k samples, variable range 5–15, remap to 25, seed to 42.
+- For validation and test: same setup, but with 10k samples, seed to 53 and 64.
+- For OOD eval: 5k samples, variable range 16–25, seed to 75.
+
+For reproducibily, ensure the seed is set.
 
 ### 2. Build the Tokenizer
 
