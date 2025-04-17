@@ -88,6 +88,7 @@ def generate_random_formula(n_vars: int, clause_length: int = 3, variance: float
     return clauses
 
 def main(args: argparse.Namespace) -> None:
+    random.seed(args.seed)
     formulas = []
     for _ in tqdm(range(args.num_formulas), desc="Generating formulas..."):
         n_vars = int(random.uniform(args.n_vars_range[0], args.n_vars_range[1]))
@@ -151,6 +152,7 @@ if __name__ == "__main__":
         action="store_true",
         help="Validate the CDCL result using PySAT for correctness."
     )
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility.")
     args = parser.parse_args()
     main(args)
 
