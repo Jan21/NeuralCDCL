@@ -133,6 +133,10 @@ def main(args: argparse.Namespace) -> None:
         }
         data.append(data_entry)
 
+    output_dir = os.path.dirname(args.output_file)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+
     # Write the dataset to JSON file
     with open(args.output_file, "w") as f:
         json.dump(data, f, indent=2)
