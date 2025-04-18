@@ -12,6 +12,7 @@ general:
   project: "SAT_LLM"
   run_name: "${now:%Y%m%d_%H%M%S}-GPT-${train.model.n_layer}x${train.model.n_head}x${train.model.n_embd}_bs${train.trainer.batch_size}_ctx${train.model.block_size}"
   accelerator: "cpu"  # "cpu", "gpu", "tpu", "hpu", "auto"
+  torch_cpu_threads: 1
   devices: 1  # Number of devices to train on (int), which devices to train on (list or str), or "auto".
   seed: 21
 
