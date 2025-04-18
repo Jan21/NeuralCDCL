@@ -25,7 +25,7 @@ from src.model.lit_wrapper import LitWrapper
 
 @hydra.main(config_path="../config", config_name="config", version_base=None)
 def main(cfg: DictConfig):
-    torch.set_num_threads(cfg.general.torch_cpu_threads)
+    torch.set_num_threads(os.cpu_count())
 
     # Save config.
     config_path = to_absolute_path(cfg.paths.config_export)
