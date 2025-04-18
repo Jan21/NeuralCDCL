@@ -23,9 +23,6 @@ from src.model.callbacks.inference import InferenceCallback
 from src.model.lit_wrapper import LitWrapper
 
 
-# os.environ["WANDB_MODE"] = "disabled"
-
-
 @hydra.main(config_path="../config", config_name="config", version_base=None)
 def main(cfg: DictConfig):
     # Save config.
@@ -81,10 +78,8 @@ def main(cfg: DictConfig):
                                                sample_size=cfg['train']['callbacks']['inference_sample_size'], resample_each_time=False)
 
     trainer = L.Trainer(
-        # accelerator="cuda",
-        # devices=cfg.general.devices,
-        accelerator='cpu',
-        devices=1,
+        accelerator=cfg.general.accelerator,
+        devices=cfg.general.devices,
         max_epochs=cfg.train.trainer.epochs,
         accumulate_grad_batches=cfg.train.trainer.accumulate_grad_batches,
         precision="16-mixed",
