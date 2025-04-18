@@ -2,11 +2,11 @@ logs/
 model/pythia-160m-random
 hf_model_pythia_160m/
 temp/
-data/
+# Ignore only JSON files in data/
+data/*.json
 checkpoints/
 sos/
 pythia-160m-random-weights/
-data/*
 __pycache__
 wandb
 .vscode
