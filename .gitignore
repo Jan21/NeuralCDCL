@@ -5,6 +5,8 @@ hf_model_pythia_160m/
 temp/
 # Ignore only JSON files in data/
 data/*.json
+!data/cdcl_data_debug.json
+
 checkpoints/
 sos/
 pythia-160m-random-weights/
