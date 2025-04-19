@@ -1,0 +1,4 @@
+raw_file: /scratch.ssd/koutefra/job_10499163.pbs-m1/NeuralCDCL/data/cdcl_data_ood.json
+raw_checksum: 24cc83dfc710c212211bc3aa809a254714950f34d1071424f915cc9e2dfc19de
+tokenized_file: /scratch.ssd/koutefra/job_10499163.pbs-m1/NeuralCDCL/data/tokenized_ood.pt
+tokenized_checksum: 344cdea2ae43282ed5bf0875144a85fc153e4b867363cfc4d2f86cd548403b64

@@ -61,8 +61,8 @@ data:
     ood: "${paths.data}/tokenized_ood.pt"
 
   tokenization:
-    num_workers: 4
-    batch_size: 64
+    num_workers: 16
+    batch_size: 128
 
   dataloader:
     num_workers: 4
@@ -115,16 +115,17 @@ train:
 
   optimizer:
     warmup_steps: 1000
-    lr: 1e-4
+    peak_lr: 1e-4
+    min_lr: 1e-6
     weight_decay: 0.01
     betas: [0.9, 0.999]
 
   trainer:
     accumulate_grad_batches: 4
-    epochs: 10
-    val_check_interval: 0.33
+    epochs: 15
+    val_check_interval: 0.2
     log_every_n_step: 20
 
   callbacks:
-    inference_sample_size: 5
-    inference_max_steps: 8192
+    inference_sample_size: 3
+    inference_max_steps: 32768

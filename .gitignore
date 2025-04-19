@@ -9,6 +9,7 @@ data/*.pt
 !data/cdcl_data_debug.json
 !data/tokenized_debug.pt
 
+*.pbs
 checkpoints/
 sos/
 pythia-160m-random-weights/

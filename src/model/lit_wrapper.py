@@ -2,23 +2,28 @@ import torch
 import lightning as L
 from torch.optim.lr_scheduler import LambdaLR
 from litgpt import LLM
+import math
 
 
-def linear_warmup_then_const(warmup_steps: int):
+def linear_warmup_then_cosine(warmup_steps: int, total_steps: int, min_lr: float, peak_lr: float):
     def fn(step: int):
         if step < warmup_steps:
-            return float(step) / float(max(1, warmup_steps))
-        return 1.0  # stay constant
+            return (float(step) / float(max(1, warmup_steps))) * (peak_lr / peak_lr)
+        progress = float(step - warmup_steps) / float(max(1, total_steps - warmup_steps))
+        cosine = 0.5 * (1 + math.cos(math.pi * progress))
+        lr = min_lr + (peak_lr - min_lr) * cosine
+        return lr / peak_lr  # LambdaLR expects multiplier of initial LR
     return fn
 
 
 class LitWrapper(L.LightningModule):
-    def __init__(self, model: LLM, cfg):
+    def __init__(self, model: LLM, cfg, total_steps: int):
         super().__init__()
         self._model = model
         self.block_size = cfg.train.model.block_size
         self._cfg = cfg
         self._loss_fn = torch.nn.CrossEntropyLoss()
+        self._total_steps = total_steps
         self.save_hyperparameters()
 
     def forward(self, x):
@@ -44,14 +49,19 @@ class LitWrapper(L.LightningModule):
 
         optimizer = torch.optim.AdamW(
             self.parameters(),
-            lr=cfg.optimizer.lr,
+            lr=cfg.optimizer.peak_lr,
             weight_decay=cfg.optimizer.weight_decay,
             betas=tuple(cfg.optimizer.betas),
         )
 
         scheduler = LambdaLR(
             optimizer,
-            lr_lambda=linear_warmup_then_const(cfg.optimizer.warmup_steps)
+            lr_lambda=linear_warmup_then_cosine(
+                warmup_steps=cfg.optimizer.warmup_steps,
+                total_steps=self._total_steps,
+                min_lr=cfg.optimizer.min_lr,
+                peak_lr=cfg.optimizer.peak_lr
+            )
         )
 
         return {

@@ -68,7 +68,7 @@ def main(cfg: DictConfig):
         split: loader_builder.build_dataloader(dataset, shuffle=(split == "train"))
         for split, dataset in datasets.items()
     }
-    
+
     # LLM config.
     lit_cfg = Config(
         name=cfg.general.run_name,
@@ -82,7 +82,9 @@ def main(cfg: DictConfig):
     )
     preprocessor = Preprocessor(tokenizer, device="cpu")
     llm = LLM(GPT(lit_cfg), preprocessor=preprocessor, config=lit_cfg)
-    model = LitWrapper(llm, cfg)
+    steps_per_epoch = len(datasets["train"]) // (cfg.data.dataloader.batch_size * cfg.train.trainer.accumulate_grad_batches)
+    total_steps = steps_per_epoch * cfg.train.trainer.epochs
+    model = LitWrapper(llm, cfg, total_steps=total_steps)
 
     # Wandb config.
     flattened_cfg = OmegaConf.to_container(cfg, resolve=True)

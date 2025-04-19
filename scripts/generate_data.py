@@ -25,7 +25,7 @@ parser.add_argument(
     help="Enable variable remapping. Provide a number to override. 0 means no remap."
 )
 parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility.")
-parser.add_argument("--split", type=str, required=True, help="Which data file to use. Options: train, val, test, ood.")
+parser.add_argument("--split", type=str, help="Which data file to use. Options: train, val, test, ood.")
 
 cli_args, unknown = parser.parse_known_args()  # `unknown` gets passed to Hydra
 sys.argv = [sys.argv[0]] + unknown  # Hydra now sees only unknowns or config overrides
@@ -35,19 +35,20 @@ sys.argv = [sys.argv[0]] + unknown  # Hydra now sees only unknowns or config ove
 def main(cfg: DictConfig):
     random.seed(cli_args.seed)
 
-    split_cfg = cfg.data_generation.defaults[cli_args.split]
+    if cli_args.split is not None:
+        split_cfg = cfg.data_generation.defaults[cli_args.split]
 
-    # Override CLI args only if they were not set explicitly
-    if cli_args.remap_vars_up_to == parser.get_default("remap_vars_up_to"):
-        cli_args.remap_vars_up_to = cfg.data_generation.defaults.remap_vars_up_to
-    if cli_args.num_formulas == parser.get_default("num_formulas"):
-        cli_args.num_formulas = split_cfg.num_formulas
-    if cli_args.n_vars_range == parser.get_default("n_vars_range"):
-        cli_args.n_vars_range = split_cfg.n_vars_range
-    if cli_args.variance == parser.get_default("variance"):
-        cli_args.variance = split_cfg.variance
-    if cli_args.seed == parser.get_default("seed"):
-        cli_args.seed = split_cfg.seed
+        # Override CLI args only if they were not set explicitly
+        if cli_args.remap_vars_up_to == parser.get_default("remap_vars_up_to"):
+            cli_args.remap_vars_up_to = cfg.data_generation.defaults.remap_vars_up_to
+        if cli_args.num_formulas == parser.get_default("num_formulas"):
+            cli_args.num_formulas = split_cfg.num_formulas
+        if cli_args.n_vars_range == parser.get_default("n_vars_range"):
+            cli_args.n_vars_range = split_cfg.n_vars_range
+        if cli_args.variance == parser.get_default("variance"):
+            cli_args.variance = split_cfg.variance
+        if cli_args.seed == parser.get_default("seed"):
+            cli_args.seed = split_cfg.seed
 
     print(
         f"[Config] Split: {cli_args.split}, "
