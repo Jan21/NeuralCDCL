@@ -20,9 +20,9 @@ class DataloaderBuilder:
         self._device = device or torch.device("cpu")
 
     def _collate_fn(self, batch: list[dict[str, list[int]]]) -> dict[str, torch.Tensor]:
-        input_ids = [torch.tensor(item["input_ids"], device=self._device) for item in batch]
-        attention_mask = [torch.tensor(item["attention_mask"], device=self._device) for item in batch]
-        labels = [torch.tensor(item["labels"], device=self._device) for item in batch]
+        input_ids = [torch.tensor(item["input_ids"]) for item in batch]
+        attention_mask = [torch.tensor(item["attention_mask"]) for item in batch]
+        labels = [torch.tensor(item["labels"]) for item in batch]
 
         input_ids = torch.nn.utils.rnn.pad_sequence(input_ids, batch_first=True, padding_value=self._registry.tokens['pad'])
         attention_mask = torch.nn.utils.rnn.pad_sequence(attention_mask, batch_first=True, padding_value=0)

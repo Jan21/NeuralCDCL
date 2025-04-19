@@ -39,6 +39,7 @@ class EvalCallback(Callback):
         seen = 0
         with torch.no_grad():
             for batch in self._loader:
+                batch = {k: v.to(pl_module.device) for k, v in batch.items()}
                 inputs, labels = batch["input_ids"], batch["labels"]
                 logits = pl_module(inputs)  # [B, T, V]
                 B, T, V = logits.shape

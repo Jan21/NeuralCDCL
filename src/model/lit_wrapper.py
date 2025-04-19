@@ -30,6 +30,7 @@ class LitWrapper(L.LightningModule):
         return self._model.forward(x)
 
     def training_step(self, batch, batch_idx):
+        batch = {k: v.to(self.device) for k, v in batch.items()}
         x, y = batch["input_ids"], batch["labels"]
         logits = self._model(x)
         loss = self._loss_fn(logits.view(-1, logits.size(-1)), y.view(-1))
@@ -39,6 +40,7 @@ class LitWrapper(L.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
+        batch = {k: v.to(self.device) for k, v in batch.items()}
         x, y = batch["input_ids"], batch["labels"]
         logits = self._model(x)
         loss = self._loss_fn(logits.view(-1, logits.size(-1)), y.view(-1))
