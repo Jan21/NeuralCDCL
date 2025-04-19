@@ -9,14 +9,14 @@ class CommandParser:
         self.command = None # e.g., "READ_ASSIGNMENTS" or "WRITE_LIT"
         self.payload = [] # tokens between WRITE_BEGIN/WRITE_END
 
-        self.write_begin_token = registry.write_block_markers[0]
-        self.write_end_token = registry.write_block_markers[1]
+        self.write_begin_token = registry.tokens['structural']['write'][0]
+        self.write_end_token = registry.tokens['structural']['write'][1]
 
         # Flatten all commands into one mapping: token_id -> command_name
         self.token_to_cmd = {
-            **{v: k for k, v in registry.read_cmd_tokens.items()},
-            **{v: k for k, v in registry.write_cmd_tokens.items()},
-            **{v: k for k, v in registry.action_cmd_tokens.items()},
+            **{v: k for k, v in registry.tokens['commands']['read'].items()},
+            **{v: k for k, v in registry.tokens['commands']['write'].items()},
+            **{v: k for k, v in registry.tokens['commands']['action'].items()},
         }
 
     def reset(self):

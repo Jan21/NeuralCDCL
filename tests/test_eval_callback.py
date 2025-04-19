@@ -64,13 +64,14 @@ def test_eval_callback_basic(cfg, tokenizer):
 
     model = DummyModel()
 
-    # Patch log method to capture metrics
+    # Patch log_dict method to capture metrics
     logged = {}
 
-    def fake_log(name, val, **_):
-        logged[name] = val.item() if torch.is_tensor(val) else val
+    def fake_log_dict(dct, **_):
+        for k, v in dct.items():
+            logged[k] = v.item() if torch.is_tensor(v) else v
 
-    model.log = fake_log
+    model.log_dict = fake_log_dict
 
     callback.on_train_epoch_end(trainer, model)
 

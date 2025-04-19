@@ -5,22 +5,21 @@ from src.model.parser import CommandParser
 
 class AutoregressiveCDCLEnvironment:
     def __init__(self, registry: CommandRegistry, scratchpad: CDCLScratchpad, command_parser: CommandParser):
-        self._registry = registry
         self._scratchpad = scratchpad
 
-        self._history = [registry.solve_block_markers[0]]
+        self._history = [registry.tokens['structural']['solve'][0]]
         self._command_parser = command_parser
         self._stashed_history = None
 
         # Fast access tokens
-        self._unit_prop_begin = self._registry.up_block_markers[0]
-        self._unit_prop_end = self._registry.up_block_markers[1]
-        self._ac_begin = self._registry.ac_block_markers[0]
-        self._ac_end = self._registry.ac_block_markers[1]
-        self._solve_end = self._registry.solve_block_markers[1]
+        self._unit_prop_begin = registry.tokens['structural']['up'][0]
+        self._unit_prop_end = registry.tokens['structural']['up'][1]
+        self._ac_begin = registry.tokens['structural']['ac'][0]
+        self._ac_end = registry.tokens['structural']['ac'][1]
+        self._solve_end = registry.tokens['structural']['solve'][1]
 
-        self._call_up = self._registry.action_cmd_tokens["CALL_UNIT_PROPAGATION"]
-        self._call_ac = self._registry.action_cmd_tokens["CALL_ANALYZE_CONFLICT"]
+        self._call_up = registry.tokens['commands']['action']["CALL_UNIT_PROPAGATION"]
+        self._call_ac = registry.tokens['commands']['action']["CALL_ANALYZE_CONFLICT"]
 
     def append(self, token: int):
         """

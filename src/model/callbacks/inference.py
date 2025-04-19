@@ -5,7 +5,7 @@ from lightning.pytorch.core.module import LightningModule
 import wandb
 
 from src.cdcl.env import AutoregressiveCDCLEnvironment
-from src.dataset.dataset import CDCLDataset
+from src.dataset.dataset import TokenizedDataset
 from src.model.registry import CommandRegistry
 from src.model.parser import CommandParser
 from src.cdcl.scratchpad import CDCLScratchpad
@@ -13,7 +13,7 @@ from src.model.inference import InferenceRunner
 
 
 class InferenceCallback(Callback):
-    def __init__(self, dataset: CDCLDataset, dataset_name: str, registry: CommandRegistry, tokenizer: Tokenizer,
+    def __init__(self, dataset: TokenizedDataset, dataset_name: str, registry: CommandRegistry, tokenizer: Tokenizer,
                  max_steps: int, sample_size: int, resample_each_time: bool, eval_every_n_epochs: int = 1):
         """
         Args:

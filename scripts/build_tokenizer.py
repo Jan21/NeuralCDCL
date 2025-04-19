@@ -1,23 +1,26 @@
 import sys
+import os
 import argparse
+import re
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--num_examples", type=int, default=1000, help="Number of examples to for infering the vocabulary")
-parser.add_argument("--split", type=str, default='ood', help="Which data file to use.")
-cli_args, unknown = parser.parse_known_args()  # `unknown` gets passed to Hydra
-sys.argv = [sys.argv[0]] + unknown  # Hydra now sees only unknowns or config overrides
+import hydra
+from hydra.utils import to_absolute_path
+from omegaconf import DictConfig
+from typing import List
 
 from tokenizers import Tokenizer
 from tokenizers.models import WordLevel
 from tokenizers.pre_tokenizers import WhitespaceSplit
 
-import os
-import json
-import re
-import hydra
-from hydra.utils import to_absolute_path
-from omegaconf import DictConfig
-from typing import List
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from src.dataset.raw_data_loader import RawDataLoader
+
+parser = argparse.ArgumentParser(description="Tokenizer builder.")
+parser.add_argument("--num_examples", type=int, default=1000, help="Number of examples to for infering the vocabulary")
+parser.add_argument("--split", type=str, default='ood', help="Which data file to use.")
+cli_args, unknown = parser.parse_known_args()  # `unknown` gets passed to Hydra
+sys.argv = [sys.argv[0]] + unknown  # Hydra now sees only unknowns or config overrides
 
 
 def save_tokenizer(vocab: list[str], save_path: str, special_tokens=None, save_vocab_txt=True):
@@ -50,8 +53,7 @@ def build_vocab_from_texts(texts: List[str]) -> List[str]:
 
 @hydra.main(config_path="../config", config_name="config", version_base=None)
 def main(cfg: DictConfig):
-    with open(to_absolute_path(cfg.data.files[cli_args.split]), "r") as f:
-        raw_data = json.load(f)
+    raw_data = RawDataLoader(cfg).load(cli_args.split)
 
     if cli_args.num_examples is not None:
         raw_data = raw_data[:cli_args.num_examples]

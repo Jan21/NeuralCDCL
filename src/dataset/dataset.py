@@ -1,56 +1,66 @@
 from torch.utils.data import Dataset
 from typing import Optional, Literal
+from typing import Optional, Union, Iterable, Literal
 import torch
 import random
-from dataclasses import dataclass
+
+from src.dataset.trace import TraceTokenized
 
 
-@dataclass
-class TokenizedTraceExample:
-    input_clauses: dict
-    solve: dict
-    unit_propagation: list[dict]
-    analyze_conflict: list[dict]
+class TokenizedDataset(Dataset):
+    def __init__(
+        self, 
+        examples: list[TraceTokenized], 
+        kind: Optional[Union[Literal["solve", "up", "ac"], Iterable[Literal["solve", "up", "ac"]]]] = None
+    ):
+        self._examples = examples
+        self._kind_filter = self._normalize_kind(kind)
+        self._rebuild_index_map()
 
-    def compose(self, up_call_token: int, ac_call_token: int) -> list[int]:
-        composed = []
-        up_idx = 0
-        ac_idx = 0
+    def _normalize_kind(self, kind) -> set[str]:
+        if kind is None:
+            return {"solve", "up", "ac"}
+        if isinstance(kind, str):
+            return {kind}
+        return set(kind)
 
-        solve_ids = self.solve["input_ids"]
+    def _rebuild_index_map(self):
+        self._index_map = []
 
-        for token in solve_ids:
-            composed.append(token)
-            if token == up_call_token:
-                composed.extend(self.unit_propagation[up_idx]["input_ids"])
-                up_idx += 1
-            elif token == ac_call_token:
-                composed.extend(self.analyze_conflict[ac_idx]["input_ids"])
-                ac_idx += 1
+        for i, ex in enumerate(self._examples):
+            if "solve" in self._kind_filter:
+                self._index_map.append((i, "solve", None))
+            if "up" in self._kind_filter:
+                self._index_map.extend((i, "up", j) for j in range(len(ex.unit_propagation)))
+            if "ac" in self._kind_filter:
+                self._index_map.extend((i, "ac", j) for j in range(len(ex.analyze_conflict)))
 
-        return composed
+        self._length = len(self._index_map)
 
+    def filter_by_block_size(self, max_len: int) -> "TokenizedDataset":
+        def is_valid(ex: TraceTokenized) -> bool:
+            return all(len(x["input_ids"]) <= max_len for x in [ex.solve] + ex.unit_propagation + ex.analyze_conflict)
 
-class CDCLDataset(Dataset):
-    def __init__(self, examples: list[TokenizedTraceExample]):
-        self.examples = examples
-        self._length = sum(1 + len(e.unit_propagation) + len(e.analyze_conflict) for e in examples)
+        init_len = len(self.examples)
+        self._examples = [ex for ex in self._examples if is_valid(ex)]
+        self._rebuild_index_map()
+        print(f"Filtered dataset to {len(self._examples)} examples (max_len = {max_len}, original_length = {init_len})")
+        return self
 
-        # Mapping from flat index (example_idx, trace_type, sub_idx)
-        # trace_type is one of {"solve", "up", "ac"}
-        self._index_map: list[tuple[int, Literal["solve", "up", "ac"], Optional[int]]] = []
+    @property
+    def examples(self) -> list[TraceTokenized]:
+        return self._examples
 
-        for i, ex in enumerate(examples):
-            self._index_map.append((i, "solve", None))
-            self._index_map.extend((i, "up", j) for j in range(len(ex.unit_propagation)))
-            self._index_map.extend((i, "ac", j) for j in range(len(ex.analyze_conflict)))
+    @property
+    def kind(self) -> set[str]:
+        return self._kind_filter
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self._length
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx) -> dict[str, list[int]]:
         example_idx, kind, sub_idx = self._index_map[idx]
-        ex = self.examples[example_idx]
+        ex = self._examples[example_idx]
 
         if kind == "solve":
             trace = ex.solve
@@ -61,20 +71,29 @@ class CDCLDataset(Dataset):
         else:
             raise ValueError(f"Unknown trace kind: {kind}")
 
-        return {k: torch.tensor(v) for k, v in trace.items()}
+        return trace
 
-    def sample_full_traces(self, n: int) -> list[TokenizedTraceExample]:
+    def sample_full_traces(self, n: int) -> list[TraceTokenized]:
         """
         Randomly samples up to `n` solve traces with their corresponding input_clauses and tokenized data.
         """
-        solve_indices = [
-            idx for idx, (ex_idx, kind, _) in enumerate(self._index_map)
-            if kind == "solve"
-        ]
-
+        solve_indices = [i for i, (_, kind, _) in enumerate(self._index_map) if kind == "solve"]
         sampled = random.sample(solve_indices, min(n, len(solve_indices)))
+        return [self._examples[self._index_map[i][0]] for i in sampled]
 
-        return [
-            self.examples[self._index_map[idx][0]]
-            for idx in sampled
-        ]
+    def save(self, path: str) -> None:
+        torch.save({
+            "examples": self._examples,
+            "kind_filter": self._kind_filter
+        }, path)
+
+    @staticmethod
+    def load(path: str) -> "TokenizedDataset":
+        data = torch.load(path)
+        return TokenizedDataset(data["examples"], kind=data["kind_filter"])
+
+    def __repr__(self):
+        return (
+            f"<TokenizedDataset with {len(self._examples)} examples, "
+            f"{self._length} total subtraces, kind={sorted(self._kind_filter)}>"
+        )

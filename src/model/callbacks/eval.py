@@ -83,11 +83,11 @@ class EvalCallback(Callback):
         pl_module.train()
 
     def _get_trace_type(self, first_token: int) -> Optional[str]:
-        if first_token == self._registry.solve_block_markers[0]:
+        if first_token == self._registry.tokens['structural']['solve'][0]:
             return "solve"
-        elif first_token == self._registry.up_block_markers[0]:
+        elif first_token == self._registry.tokens['structural']['up'][0]:
             return "up"
-        elif first_token == self._registry.ac_block_markers[0]:
+        elif first_token == self._registry.tokens['structural']['ac'][0]:
             return "ac"
         else:
             return None

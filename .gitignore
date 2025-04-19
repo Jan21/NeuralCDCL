@@ -5,7 +5,9 @@ hf_model_pythia_160m/
 temp/
 # Ignore only JSON files in data/
 data/*.json
+data/*.pt
 !data/cdcl_data_debug.json
+!data/tokenized_debug.pt
 
 checkpoints/
 sos/

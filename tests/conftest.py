@@ -73,19 +73,24 @@ def cfg(pytestconfig):
 # -------------------------------------------------------------------
 @pytest.fixture
 def tokenized_dataset(pytestconfig, cfg, tokenizer):
-    from src.dataset.pipeline import DatasetPipeline 
+    from src.dataset.raw_data_loader import RawDataLoader
+    from src.dataset.dataset_builder import DatasetBuilder
+    from src.dataset.dataset import TokenizedDataset
 
-    data_relative_path = pytestconfig.getoption("tiny_data_path")
-    data_abs_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", data_relative_path))
-    cfg_cp = copy.deepcopy(cfg)
-    cfg_cp["data"]["files"] = {'train': data_abs_path}
-    cfg_cp["data"]["num_workers"] = 1
-    cfg_cp["data"]["tokenize_batch_size"] = 16
-    registry = CommandRegistry(cfg, tokenizer)
-    pipeline = DatasetPipeline(cfg_cp, tokenizer, registry)
-    datasets = pipeline.build(filter_by_len=True)
+    # --- Setup config overrides ---
+    data_path = pytestconfig.getoption("tiny_data_path")
+    cfg_cp = cfg.copy()
+    cfg_cp.data.files = {"train": data_path}
 
-    train_set = datasets["train"]
-    assert len(train_set) > 0, "Train set is empty!"
+    # --- Load raw data ---
+    raw_loader = RawDataLoader(cfg_cp)
+    raw_data = raw_loader.load("train")
+    assert isinstance(raw_data, list) and len(raw_data) > 0
 
-    return train_set
+    # --- Tokenize + build dataset ---
+    registry = CommandRegistry(cfg_cp, tokenizer)
+    builder = DatasetBuilder(tokenizer, registry, tokenize_batch_size=2)
+    dataset: TokenizedDataset = builder.build(raw_data)  # .filter_by_block_size(cfg_cp.train.model.block_size)
+    assert len(dataset) > 0
+
+    return dataset

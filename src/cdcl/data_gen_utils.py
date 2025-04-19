@@ -1,0 +1,74 @@
+import random
+import re
+from typing import Optional
+
+
+def remap_full_trace(full_trace: list[str], n_vars: int, remap_up_to: int) -> list[str]:
+    new_indices = sorted(random.sample(range(1, remap_up_to + 1), n_vars))
+    mapping = { i: new_indices[i-1] for i in range(1, n_vars+1) }
+    return {
+        name: [
+            [
+                remap_trace_variables(log, n_vars, mapping) for log in logs
+            ] if isinstance(logs, list)
+            else remap_trace_variables(logs, n_vars, mapping)
+            for logs in spec_trace
+        ]
+        for name, spec_trace in full_trace.items()
+    }
+
+
+def remap_trace_variables(trace_text: str, n: int, mapping: dict[int, int]) -> str:
+    """
+    Remaps variables x1..x_n to x_{f(1)}..x_{f(n)} in a monotonic way,
+    where f is a strictly increasing mapping from {1..n} to {1..N}.
+    """
+    # 2) Regex to match a variable possibly with a leading minus:
+    #    We look for an optional minus sign, then "x", then one or more digits.
+    #    We also ensure we only remap if the digits are within 1..n.
+    pattern = re.compile(r"(-?)x(\d+)")
+    
+    def replace_var(match):
+        sign      = match.group(1)       # The optional '-' sign
+        old_index = int(match.group(2))  # The integer part after 'x'
+        
+        # If it's outside 1..n, leave it unchanged (or handle error if appropriate)
+        if not (1 <= old_index <= n):
+            return match.group(0)  # return the original match with no change
+        
+        # Otherwise, map to x_{f(old_index)}
+        new_index = mapping[old_index]
+        return f"{sign}x{new_index}"
+    
+    # 3) Run the substitution
+    remapped_text = pattern.sub(replace_var, trace_text)
+    return remapped_text
+
+
+def generate_random_formula(n_vars: int, clause_length: int = 3, variance: float = 0.1, n_clauses: Optional[int] = None):
+    """
+    Generates a random CNF formula.
+    
+    Args:
+        n_vars (int): Number of variables.
+        n_clauses (int, optional): Fixed number of clauses. If None, it will be estimated.
+        clause_length (int): Number of literals per clause.
+        variance (float): Relative standard deviation in clause count (e.g., 0.1 = ±10%).
+
+    Returns:
+        list[list[int]]: A list of clauses, each clause is a list of literals.
+    """
+    balanced_n_clauses = {3: 19, 4: 24, 5: 28, 6: 33, 7: 37, 8: 41, 9: 45, 10: 50, 11: 54, 12: 58, 
+                          13: 63, 14: 67, 15: 71, 16: 76, 17: 79, 18: 83, 19: 87, 20: 92}
+    if n_clauses == None:
+        base = balanced_n_clauses.get(n_vars, int(n_vars * 4.26))
+        delta = int(base * variance)
+        n_clauses = random.randint(base - delta, base + delta)
+
+    var_range = range(1, n_vars + 1)
+    clauses = []
+    for _ in range(n_clauses):
+        clause_vars = random.sample(var_range, clause_length)
+        clause = [var if random.random() < 0.5 else -var for var in clause_vars]
+        clauses.append(clause)
+    return clauses

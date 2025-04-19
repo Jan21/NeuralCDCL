@@ -1,8 +1,7 @@
-import sys, os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+import sys
+import os
 
 import torch
-import torch.nn.functional as F
 from litgpt import LLM
 import lightning as L
 import hydra
@@ -16,7 +15,11 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 
 import random
 from tokenizers import Tokenizer
-from src.dataset.pipeline import DatasetPipeline
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from src.dataset.dataset import TokenizedDataset
+from src.dataset.dataloader_builder import DataloaderBuilder
 from src.model.registry import CommandRegistry
 from src.model.callbacks.eval import EvalCallback
 from src.model.callbacks.inference import InferenceCallback
@@ -27,27 +30,48 @@ from src.model.lit_wrapper import LitWrapper
 def main(cfg: DictConfig):
     torch.set_num_threads(os.cpu_count())
 
+    # For reproducibility.
+    random.seed(cfg.general.seed)
+    torch.manual_seed(cfg.general.seed)
+
+    # Set device.
+    if cfg.general.accelerator == "cpu":
+        device = torch.device("cpu")
+    elif cfg.general.accelerator in ("gpu", "cuda", "auto"):
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    elif cfg.general.accelerator == "mps":
+        device = torch.device("mps")
+    else:
+        raise ValueError(f"Unsupported accelerator: {cfg.general.accelerator}")
+
     # Save config.
     config_path = to_absolute_path(cfg.paths.config_export)
     os.makedirs(os.path.dirname(config_path), exist_ok=True)
     OmegaConf.save(cfg, config_path)
-
-    # For reproducibility.
-    random.seed(cfg.general.seed)
-    torch.manual_seed(cfg.general.seed)
 
     # Tokenizer.
     tokenizer = Tokenizer.from_file(to_absolute_path(cfg.paths.tokenizer))
     registry = CommandRegistry(cfg, tokenizer)
 
     # Data.
-    pipeline = DatasetPipeline(cfg, tokenizer, registry)
-    datasets = pipeline.build()
-    dataloaders = pipeline.build_dataloaders(datasets)
-
-    # LitGPT.
+    datasets = {
+        split: TokenizedDataset.load(path).filter_by_block_size(max_len=cfg.train.model.block_size)
+        for split, path in cfg.data.tokenized_files.items()
+    }
+    loader_builder = DataloaderBuilder(
+        batch_size=cfg.data.dataloader.batch_size,
+        registry=registry,
+        num_workers=cfg.data.dataloader.num_workers,
+        device=device
+    )
+    dataloaders = {
+        split: loader_builder.build_dataloader(dataset, shuffle=(split == "train"))
+        for split, dataset in datasets.items()
+    }
+    
+    # LLM config.
     lit_cfg = Config(
-        name="cdcl-pythia",
+        name=cfg.general.run_name,
         block_size=cfg.train.model.block_size,
         n_layer=cfg.train.model.n_layer,
         n_head=cfg.train.model.n_head,
@@ -60,6 +84,7 @@ def main(cfg: DictConfig):
     llm = LLM(GPT(lit_cfg), preprocessor=preprocessor, config=lit_cfg)
     model = LitWrapper(llm, cfg)
 
+    # Wandb config.
     flattened_cfg = OmegaConf.to_container(cfg, resolve=True)
     logger = WandbLogger(project=cfg.general.project, name=f"{cfg.general.run_name}", config=flattened_cfg)
 
@@ -85,7 +110,7 @@ def main(cfg: DictConfig):
         max_epochs=cfg.train.trainer.epochs,
         accumulate_grad_batches=cfg.train.trainer.accumulate_grad_batches,
         precision="16-mixed",
-        val_check_interval=cfg['train']['callbacks']['val_check_interval'],
+        val_check_interval=cfg['train']['trainer']['val_check_interval'],
         callbacks=[
             checkpoint_callback,
             val_eval_loss_callback,
@@ -94,7 +119,7 @@ def main(cfg: DictConfig):
             ood_inference_callback,
         ],
         logger=logger,
-        log_every_n_steps=cfg['train']['callbacks']['train_log_every_n_steps']
+        log_every_n_steps=cfg['train']['trainer']['log_every_n_step']
     )
 
     trainer.fit(

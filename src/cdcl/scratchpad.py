@@ -13,13 +13,13 @@ class CDCLScratchpad:
 
         self._saved_tokens_dict['clauses'] = tokenized_input_clauses
 
-        self._read_begin_token = registry.read_block_markers[0]
-        self._read_end_token = registry.read_block_markers[1]
+        self._read_begin_token = registry.tokens['structural']['read'][0]
+        self._read_end_token = registry.tokens['structural']['read'][1]
 
-        self._semantic_begin_token = registry.semantic_block_markers[0]
-        self._semantic_end_token = registry.semantic_block_markers[1]
+        self._semantic_begin_token = registry.tokens['structural']['semantic'][0]
+        self._semantic_end_token = registry.tokens['structural']['semantic'][1]
 
-        self._counter_unit_token = registry.counter_unit_token
+        self._counter_unit_token = registry.tokens['counter_unit_token']
 
         self._handlers = {
             "assignments": {"type": "list", "write": self._write_append, "wrap_tokens": False},

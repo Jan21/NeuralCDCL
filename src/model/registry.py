@@ -4,24 +4,39 @@ from omegaconf import DictConfig
 
 class CommandRegistry:
     def __init__(self, cfg: DictConfig, tokenizer: Tokenizer):
-        spec = cfg.data.special_tokens
+        tokens = cfg.tokens
 
-        self.pad_token = tokenizer.token_to_id("[PAD]")
+        self._tokens = {
+            'pad': tokenizer.token_to_id("[PAD]"),
+            'counter_unit_token': tokenizer.token_to_id(tokens.labels.counter_unit_token),
+            'sat_token': tokenizer.token_to_id(tokens.labels.sat_token),
+            'unsat_token': tokenizer.token_to_id(tokens.labels.unsat_token),
 
-        # Command token mappings
-        self.read_cmd_tokens = {tok: tokenizer.token_to_id(tok) for tok in spec.read_cmd_tokens}
-        self.write_cmd_tokens = {tok: tokenizer.token_to_id(tok) for tok in spec.write_cmd_tokens}
-        self.action_cmd_tokens = {tok: tokenizer.token_to_id(tok) for tok in spec.action_cmd_tokens}
+            'structural': {
+                'read': tuple(tokenizer.token_to_id(tok) for tok in tokens.structural.read_block),
+                'write': tuple(tokenizer.token_to_id(tok) for tok in tokens.structural.write_block),
+                'solve': tuple(tokenizer.token_to_id(tok) for tok in tokens.structural.solve_block),
+                'up': tuple(tokenizer.token_to_id(tok) for tok in tokens.structural.unit_prop_block),
+                'ac': tuple(tokenizer.token_to_id(tok) for tok in tokens.structural.analyze_conflict_block),
+                'semantic': tuple(tokenizer.token_to_id(tok) for tok in tokens.structural.semantic_block),
+            },
 
-        # Block markers
-        self.read_block_markers = tuple(tokenizer.token_to_id(tok) for tok in spec.read_block_markers)
-        self.write_block_markers = tuple(tokenizer.token_to_id(tok) for tok in spec.write_block_markers)
-        self.solve_block_markers = tuple(tokenizer.token_to_id(tok) for tok in spec.solve_markers)
-        self.up_block_markers = tuple(tokenizer.token_to_id(tok) for tok in spec.unit_prop_markers)
-        self.ac_block_markers = tuple(tokenizer.token_to_id(tok) for tok in spec.analyze_conflict_markers)
-        self.semantic_block_markers = tuple(tokenizer.token_to_id(tok) for tok in spec.semantic_markers)
+            'commands': {
+                'read': {
+                    token_str: tokenizer.token_to_id(token_str)
+                    for token_str in tokens.commands.read.values()
+                },
+                'write': {
+                    token_str: tokenizer.token_to_id(token_str)
+                    for token_str in tokens.commands.write.values()
+                },
+                'action': {
+                    token_str: tokenizer.token_to_id(token_str)
+                    for token_str in tokens.commands.action.values()
+                }
+            },
+        }
 
-        self.counter_unit_token = tokenizer.token_to_id(spec.counter_unit_token)
-
-        self.sat_token = tokenizer.token_to_id(spec.sat_token)
-        self.unsat_token = tokenizer.token_to_id(spec.unsat_token)
+    @property
+    def tokens(self) -> dict:
+        return self._tokens

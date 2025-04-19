@@ -10,7 +10,7 @@ hydra:
 
 general:
   project: "SAT_LLM"
-  run_name: "${now:%Y%m%d_%H%M%S}-GPT-${train.model.n_layer}x${train.model.n_head}x${train.model.n_embd}_bs${train.trainer.batch_size}_ctx${train.model.block_size}"
+  run_name: "${now:%Y%m%d_%H%M%S}-GPT-${train.model.n_layer}x${train.model.n_head}x${train.model.n_embd}_bs${data.dataloader.batch_size}_ctx${train.model.block_size}"
   accelerator: "cpu"  # "cpu", "gpu", "tpu", "hpu", "auto"
   devices: 1  # Number of devices to train on (int), which devices to train on (list or str), or "auto".
   seed: 21
@@ -23,53 +23,90 @@ paths:
   tokenizer: "tokenizer/tokenizer.json"
   data: "data"
 
+data_generation:
+  defaults:
+    remap_vars_up_to: 25
+    train:
+      num_formulas: 100000
+      n_vars_range: [5, 15]
+      variance: 0.1
+      seed: 42
+    val:
+      num_formulas: 10000
+      n_vars_range: [5, 15]
+      variance: 0.1
+      seed: 53
+    test:
+      num_formulas: 10000
+      n_vars_range: [5, 15]
+      variance: 0.1
+      seed: 64
+    ood:
+      num_formulas: 5000
+      n_vars_range: [16, 25]
+      variance: 0.1
+      seed: 75
+
 data:
-  files:
+  raw_files:
     train: "${paths.data}/cdcl_data_train.json"
     val: "${paths.data}/cdcl_data_val.json"
     test: "${paths.data}/cdcl_data_test.json"
     ood: "${paths.data}/cdcl_data_ood.json"
-  num_workers: 4
-  tokenize_batch_size: 64
-  special_tokens:
-    read_block_markers: ["READ_BEGIN", "READ_END"]
-    read_cmd_tokens:
-      - "READ_ASSIGNMENTS"
-      - "READ_CLAUSES"
-      - "READ_LEARNED_CLAUSES"
-      - "READ_DECISION_LEVELS"
-      - "READ_REASON_CLAUSES"
-      - "READ_CONFLICT_CLAUSE"
-      - "READ_LEVEL"
-    write_block_markers: ["WRITE_BEGIN", "WRITE_END"]
-    write_cmd_tokens:
-      - "WRITE_ASSIGNMENTS"
-      - "WRITE_REASON_CLAUSES"
-      - "WRITE_DECISION_LEVELS"
-      - "WRITE_LEARNED_CLAUSES"
-      - "WRITE_BACKTRACK_LEVEL"
-      - "WRITE_CONFLICT_CLAUSE"
-    action_cmd_tokens: ["BACKTRACK", "LEVEL_UP", "CALL_UNIT_PROPAGATION", "CALL_ANALYZE_CONFLICT"]
-    solve_markers: ["SOLVE_BEGIN", "SOLVE_END"]
-    unit_prop_markers: ["UNIT_PROPAGATION_BEGIN", "UNIT_PROPAGATION_END"]
-    analyze_conflict_markers: ["ANALYZE_CONFLICT_BEGIN", "ANALYZE_CONFLICT_END"]
-    semantic_markers: ["[", "]"]
+
+  tokenized_files:
+    train: "${paths.data}/tokenized_train.pt"
+    val: "${paths.data}/tokenized_val.pt"
+    test: "${paths.data}/tokenized_test.pt"
+    ood: "${paths.data}/tokenized_ood.pt"
+
+  tokenization:
+    num_workers: 4
+    batch_size: 64
+
+  dataloader:
+    num_workers: 4
+    batch_size: 4
+
+tokens:
+  structural:
+    read_block: ["READ_BEGIN", "READ_END"]
+    write_block: ["WRITE_BEGIN", "WRITE_END"]
+    solve_block: ["SOLVE_BEGIN", "SOLVE_END"]
+    unit_prop_block: ["UNIT_PROPAGATION_BEGIN", "UNIT_PROPAGATION_END"]
+    analyze_conflict_block: ["ANALYZE_CONFLICT_BEGIN", "ANALYZE_CONFLICT_END"]
+    semantic_block: ["[", "]"]
+  
+  commands:
+    read:
+      assignments: "READ_ASSIGNMENTS"
+      clauses: "READ_CLAUSES"
+      learned_clauses: "READ_LEARNED_CLAUSES"
+      decision_levels: "READ_DECISION_LEVELS"
+      reason_clauses: "READ_REASON_CLAUSES"
+      conflict_clause: "READ_CONFLICT_CLAUSE"
+      level: "READ_LEVEL"
+
+    write:
+      assignments: "WRITE_ASSIGNMENTS"
+      reason_clauses: "WRITE_REASON_CLAUSES"
+      decision_levels: "WRITE_DECISION_LEVELS"
+      learned_clauses: "WRITE_LEARNED_CLAUSES"
+      backtrack_level: "WRITE_BACKTRACK_LEVEL"
+      conflict_clause: "WRITE_CONFLICT_CLAUSE"
+
+    action:
+      backtrack: "BACKTRACK"
+      level_up: "LEVEL_UP"
+      unit_propagation: "CALL_UNIT_PROPAGATION"
+      analyze_conflict: "CALL_ANALYZE_CONFLICT"
+
+  labels:
     counter_unit_token: "I"
     sat_token: "SAT"
     unsat_token: "UNSAT"
 
 train:
-  callbacks:
-    inference_sample_size: 5
-    inference_max_steps: 8192
-    val_check_interval: 0.33
-    train_log_every_n_steps: 20
-
-  trainer:
-    batch_size: 2
-    accumulate_grad_batches: 4
-    epochs: 10
-
   model:
     n_layer: 6
     n_head: 8
@@ -81,3 +118,13 @@ train:
     lr: 1e-4
     weight_decay: 0.01
     betas: [0.9, 0.999]
+
+  trainer:
+    accumulate_grad_batches: 4
+    epochs: 10
+    val_check_interval: 0.33
+    log_every_n_step: 20
+
+  callbacks:
+    inference_sample_size: 5
+    inference_max_steps: 8192
