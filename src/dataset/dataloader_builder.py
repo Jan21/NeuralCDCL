@@ -41,5 +41,6 @@ class DataloaderBuilder:
             shuffle=shuffle,
             num_workers=self._num_workers,
             collate_fn=self._collate_fn,
-            pin_memory=(self._device.type == "cuda")
+            pin_memory=(self._device.type == "cuda"),
+            persistent_workers=(self._num_workers > 0)
         )

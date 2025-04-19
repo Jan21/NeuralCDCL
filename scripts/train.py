@@ -85,6 +85,7 @@ def main(cfg: DictConfig):
     steps_per_epoch = len(datasets["train"]) // (cfg.data.dataloader.batch_size * cfg.train.trainer.accumulate_grad_batches)
     total_steps = steps_per_epoch * cfg.train.trainer.epochs
     model = LitWrapper(llm, cfg, total_steps=total_steps)
+    model = torch.compile(model)
 
     # Wandb config.
     flattened_cfg = OmegaConf.to_container(cfg, resolve=True)
