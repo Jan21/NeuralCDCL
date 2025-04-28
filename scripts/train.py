@@ -1,6 +1,14 @@
 import sys
 import os
 
+config_name = "config"  # default
+for idx, arg in enumerate(sys.argv):
+    if arg == "--config" and idx + 1 < len(sys.argv):
+        config_name = sys.argv[idx + 1].replace(".yaml", "")  # Remove .yaml if user includes it
+        sys.argv.pop(idx)  # Remove --config
+        sys.argv.pop(idx)  # Remove config name itself
+        break
+
 import torch
 from litgpt import LLM
 import lightning as L
@@ -26,7 +34,7 @@ from src.model.callbacks.inference import InferenceCallback
 from src.model.lit_wrapper import LitWrapper
 
 
-@hydra.main(config_path="../config", config_name="config", version_base=None)
+@hydra.main(config_path="../config", config_name=config_name, version_base=None)
 def main(cfg: DictConfig):
     torch.set_num_threads(os.cpu_count())
 
