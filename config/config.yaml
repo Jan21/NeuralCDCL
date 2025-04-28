@@ -14,17 +14,17 @@ data_preprocess:
   num_val: 2048
 
 tok_data:
-  train_file: "data/train_solve.json"
-  val_file: "data/test_solve.json"
-  test_file: "data/test_solve.json"
+  train_file: "data/ca_train.json"
+  val_file: "data/ca_test.json"
+  test_file: "data/ca_test.json"
   tokenizer_path: "tokenizer/tokenizer.json"
 
 data:
   datapath: data
-  train_file: "train_solve.json"
-  val_file: "test_solve.json"
+  train_file: "ca_train.json"
+  val_file: "ca_test.json"
   num_workers: 32
-  split_str: "solve-begin"
+  split_str: "AC-begin"
 
 model:
   name: "Pythia-${model.n_layer}-${model.n_head}-${model.n_embd}-solve"
@@ -33,12 +33,12 @@ model:
   block_size: 2048
   epochs: 500
   n_layer: 12
-  n_head: 4
-  n_embd: 64
-  vocab_size: 146
-  padded_vocab_size: 146
-  bos_id: 141
-  eos_id: 145
+  n_head: 8
+  n_embd: 128
+  vocab_size: 202
+  padded_vocab_size: 202
+  bos_id: 197
+  eos_id: 201
 
 optim:
   lr: 1e-2

@@ -1,7 +1,7 @@
 from pysat.solvers import Glucose3
 import random
 from tqdm import tqdm
-
+from typing import Optional
 
 def log_var(var):
     return f"x{var}"
@@ -271,43 +271,38 @@ class CDCLSolver:
                 vars_set.add(abs(lit))
         return len(vars_set)
 
-def generate_random_formula(n_vars, n_clauses=None, clause_length=3):
+def generate_random_formula(n_vars: int, clause_length: int = 3, variance: float = 0.1, n_clauses: Optional[int] = None):
     """
-    Generate a random SAT formula with n variables.
+    Generates a random CNF formula.
+    
     Args:
-        n_vars: Number of variables
-        n_clauses: Number of clauses (default: around 4.2 * n_vars for balanced SAT/UNSAT)
-        clause_length: Length of each clause (default: 3 for 3-SAT)
+        n_vars (int): Number of variables.
+        n_clauses (int, optional): Fixed number of clauses. If None, it will be estimated.
+        clause_length (int): Number of literals per clause.
+        variance (float): Relative standard deviation in clause count (e.g., 0.1 = ±10%).
+
     Returns:
-        List of clauses, where each clause is a list of integers
+        list[list[int]]: A list of clauses, each clause is a list of literals.
     """
-    # Use empirically determined ratio for balanced SAT/UNSAT
-    if n_clauses is None:
-        n_clauses = int(4.2 * n_vars)
-        
+    balanced_n_clauses = {3: 19, 4: 24, 5: 28, 6: 33, 7: 37, 8: 41, 9: 45, 10: 50, 11: 54, 12: 58, 
+                          13: 63, 14: 67, 15: 71, 16: 76, 17: 79, 18: 83, 19: 87, 20: 92}
+    if n_clauses == None:
+        base = balanced_n_clauses.get(n_vars, int(n_vars * 4.26))
+        delta = int(base * variance)
+        n_clauses = random.randint(base - delta, base + delta)
+
+    var_range = range(1, n_vars + 1)
     clauses = []
     for _ in range(n_clauses):
-        # Generate a clause with random literals
-        clause = []
-        vars_used = set()
-        
-        while len(clause) < clause_length:
-            # Pick a random variable that hasn't been used in this clause
-            var = random.randint(1, n_vars)
-            if var not in vars_used:
-                # Randomly choose positive or negative literal
-                lit = var if random.random() < 0.5 else -var
-                clause.append(lit)
-                vars_used.add(var)
-                
+        clause_vars = random.sample(var_range, clause_length)
+        clause = [var if random.random() < 0.5 else -var for var in clause_vars]
         clauses.append(clause)
-        
     return clauses
 
  ######## TEST
-num_vars = 15
 formulas = []
 for i in tqdm(range(100000)):
+    num_vars = random.randint(5, 15)
     formulas.append(generate_random_formula(num_vars))
 
 
@@ -363,10 +358,10 @@ train_data = [{"text": trace} for trace in train_traces]
 test_data = [{"text": trace} for trace in test_traces]
 
 # Save to JSON files
-with open('./temp/train_CA.json', 'w') as f:
+with open('train_CA.json', 'w') as f:
     json.dump(train_data, f)
 
-with open('./temp/test_CA.json', 'w') as f:
+with open('test_CA.json', 'w') as f:
     json.dump(test_data, f)
 
 print(f"Saved training traces to train_traces.json")

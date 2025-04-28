@@ -17,4 +17,4 @@
 
 singularity exec \
     $SIF \
-    python data_generation/solve.py
+    python data_generation/CA.py

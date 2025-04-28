@@ -34,7 +34,6 @@ def process_and_save_file(file_path: str, tokenizer: Tokenizer, max_length: int)
     # Load data
     with open(file_path, "r") as f:
         data = json.load(f)
-    data = data[:1000]
     original_count = len(data)
     print(f"Original example count: {original_count}")
 
