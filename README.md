@@ -26,7 +26,7 @@ pip install -r requirements.txt
 Use the following script to create the training and evaluation datasets:
 
 ```bash
-python3 ./scripts/generate_data.py --n_vars_range 5 15 --num_formulas 100000 --remap_variables 25 --output_file ./data/cdcl_data_train.json
+python3 ./scripts/generate_data.py --n_vars_range 5 15 --num_formulas 100000 --remap_vars_up_to --split train
 ```
 
 - For training: 100k samples, variable range 5–15, remap to 25, seed to 42.
@@ -43,19 +43,20 @@ python3 ./scripts/build_tokenizer.py
 
 This creates the tokenizer files in `tokenizer/`.
 
-### 3. Inspect the Dataset
+### 3. Preprocess the Dataset
 
 ```bash
-python3 ./scripts/inspect_dataset.py
+python3 ./scripts/process_dataset.py  --inspect
 ```
 
-This shows tokenization behavior, label formatting, and generates length histograms. Useful for choosing a proper `block_size`.
+This creates the .pt files with pretokenized data ready to be load during training. This '--inspect' flag shows tokenization behavior, label formatting, and generates length histograms. Useful for instance for choosing a proper `block_size`. It also creates checksums.
 
 ### 4. Configure Training
 
 Edit `config.yaml` to set model, training, and hardware parameters. For example:
 - Set `block_size`, `batch_size`, etc.
 - Set `general.devices` to match the cluster hardware.
+- Set `train.dataset.kind` to select which type of traces should the model be trained on.
 
 ### 5. Run Tests
 

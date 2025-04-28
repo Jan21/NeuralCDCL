@@ -108,13 +108,17 @@ tokens:
 
 train:
   model:
-    n_layer: 6
-    n_head: 8
-    n_embd: 512
-    block_size: 1600
+    n_layer: 1
+    n_head: 2
+
+    n_embd: 4
+    block_size: 600
+
+    # n_embd: 256
+    # block_size: 1600
 
   optimizer:
-    warmup_steps: 250
+    warmup_steps: 25
     peak_lr: 1e-4
     min_lr: 1e-8
     weight_decay: 0.01
@@ -124,8 +128,15 @@ train:
     accumulate_grad_batches: 4
     epochs: 10
     val_check_interval: 0.2
-    log_every_n_step: 20
+    log_every_n_step: 2
 
   callbacks:
     inference_sample_size: 3
     inference_max_steps: 21000
+
+  dataset:
+    kind: "ac"    # options: null (default, meaning all kinds), or "solve", "up", "ac", or ["solve", "up"]
+    n_examples_train: 10
+    n_examples_val: 5
+    n_examples_test: 0
+    n_examples_ood: 5

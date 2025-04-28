@@ -47,6 +47,26 @@ class TokenizedDataset(Dataset):
         print(f"Filtered dataset to {len(self._examples)} examples (max_len = {max_len}, original_length = {init_len})")
         return self
 
+    def filter_by_kind(self, kind: Optional[Union[str, Iterable[str]]]) -> "TokenizedDataset":
+        """
+        Update the dataset to filter by a new set of kinds: "solve", "up", "ac".
+        """
+        self._kind_filter = self._normalize_kind(kind)
+        self._rebuild_index_map()
+        return self
+
+    def sample_n_examples(self, n: int) -> "TokenizedDataset":
+        """
+        Randomly subsample the dataset to only keep `n` examples.
+        """
+        if n >= len(self._examples):
+            return self
+
+        sampled_examples = random.sample(self._examples, n)
+        self._examples = sampled_examples
+        self._rebuild_index_map()
+        return self
+
     @property
     def examples(self) -> list[TraceTokenized]:
         return self._examples

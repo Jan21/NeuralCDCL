@@ -49,13 +49,18 @@ def main(cfg: DictConfig):
     os.makedirs(os.path.dirname(config_path), exist_ok=True)
     OmegaConf.save(cfg, config_path)
 
+    cfg.general.run_name += f"_{cfg.train.dataset.kind}" if cfg.train.dataset.kind else ""
+
     # Tokenizer.
     tokenizer = Tokenizer.from_file(to_absolute_path(cfg.paths.tokenizer))
     registry = CommandRegistry(cfg, tokenizer)
 
     # Data.
     datasets = {
-        split: TokenizedDataset.load(path).filter_by_block_size(max_len=cfg.train.model.block_size)
+        split: TokenizedDataset.load(path)
+        .filter_by_block_size(max_len=cfg.train.model.block_size)
+        .filter_by_kind(kind=cfg.train.dataset.kind)
+        .sample_n_examples(cfg.train.dataset[f'n_examples_{split}'])
         for split, path in cfg.data.tokenized_files.items()
     }
     loader_builder = DataloaderBuilder(
@@ -102,10 +107,13 @@ def main(cfg: DictConfig):
     )
     val_eval_loss_callback = EvalCallback(dataloaders['val'], 'val', registry)
     ood_eval_loss_callback = EvalCallback(dataloaders['ood'], 'ood', registry)
-    val_inference_callback = InferenceCallback(datasets['val'], 'val', registry, tokenizer, max_steps=cfg['train']['callbacks']['inference_max_steps'], 
-                                               sample_size=cfg['train']['callbacks']['inference_sample_size'], resample_each_time=False)
-    ood_inference_callback = InferenceCallback(datasets['ood'], 'ood', registry, tokenizer, max_steps=cfg['train']['callbacks']['inference_max_steps'], 
-                                               sample_size=cfg['train']['callbacks']['inference_sample_size'], resample_each_time=False)
+    callbacks = [checkpoint_callback, val_eval_loss_callback, ood_eval_loss_callback]
+    if cfg.train.dataset.kind is None:  # all traces included 
+        val_inference_callback = InferenceCallback(datasets['val'], 'val', registry, tokenizer, max_steps=cfg['train']['callbacks']['inference_max_steps'], 
+                                                sample_size=cfg['train']['callbacks']['inference_sample_size'], resample_each_time=False)
+        ood_inference_callback = InferenceCallback(datasets['ood'], 'ood', registry, tokenizer, max_steps=cfg['train']['callbacks']['inference_max_steps'], 
+                                                sample_size=cfg['train']['callbacks']['inference_sample_size'], resample_each_time=False)
+        callbacks += [val_inference_callback, ood_inference_callback]
 
     trainer = L.Trainer(
         accelerator=cfg.general.accelerator,
@@ -114,13 +122,7 @@ def main(cfg: DictConfig):
         accumulate_grad_batches=cfg.train.trainer.accumulate_grad_batches,
         precision="16-mixed",
         val_check_interval=cfg['train']['trainer']['val_check_interval'],
-        callbacks=[
-            checkpoint_callback,
-            val_eval_loss_callback,
-            ood_eval_loss_callback,
-            val_inference_callback,
-            ood_inference_callback,
-        ],
+        callbacks=callbacks,
         logger=logger,
         log_every_n_steps=cfg['train']['trainer']['log_every_n_step']
     )

@@ -8,7 +8,7 @@ import math
 def linear_warmup_then_cosine(warmup_steps: int, total_steps: int, min_lr: float, peak_lr: float):
     def fn(step: int):
         if step < warmup_steps:
-            return (float(step) / float(max(1, warmup_steps))) * (peak_lr / peak_lr)
+            return (float(step) / float(max(1, warmup_steps)))
         progress = float(step - warmup_steps) / float(max(1, total_steps - warmup_steps))
         cosine = 0.5 * (1 + math.cos(math.pi * progress))
         lr = min_lr + (peak_lr - min_lr) * cosine
