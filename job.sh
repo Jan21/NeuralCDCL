@@ -2,7 +2,7 @@
 #SBATCH --job-name=ca_pythia    # Job name
 #SBATCH --output=logs/train/pythia_%j.out        # Standard output and error log (%j expands to jobID)
 #SBATCH --error=logs/train/pythia_%j.err         # Error log
-#SBATCH --time=24:00:00              # Time limit hrs:min:sec
+#SBATCH --time=48:00:00              # Time limit hrs:min:sec
 #SBATCH --account=project_465001424
 #SBATCH --nodes=1                      # Number of nodes requested
 #SBATCH --ntasks=1                     # Number of tasks (processes)
