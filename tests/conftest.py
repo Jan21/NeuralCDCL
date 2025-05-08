@@ -32,7 +32,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--config-path",
         action="store",
-        default="config/config.yaml",
+        default="config/config_template.yaml",
         help="Path to real OmegaConf config.yaml (relative to project root)"
     )
     parser.addoption(
