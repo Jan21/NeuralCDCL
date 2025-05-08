@@ -3,6 +3,7 @@ from typing import Optional, Literal
 from typing import Optional, Union, Iterable, Literal
 import torch
 import random
+import numpy as np
 
 from src.dataset.trace import TraceTokenized
 
@@ -117,3 +118,49 @@ class TokenizedDataset(Dataset):
             f"<TokenizedDataset with {len(self._examples)} examples, "
             f"{self._length} total subtraces, kind={sorted(self._kind_filter)}>"
         )
+
+    @staticmethod
+    def compute_weights(epoch: int, max_epochs: int, lengths: list[float], temp: float) -> np.ndarray:
+        p = epoch / max_epochs
+        lengths = np.array(lengths, dtype=np.float64)
+        lengths_scaled = lengths ** temp
+        long_bias = lengths_scaled / lengths_scaled.sum()
+
+        long_bias_inv = 1.0 - long_bias
+        short_bias = long_bias_inv / long_bias_inv.sum()
+
+        weights = (1 - p) * short_bias + p * long_bias
+        weights /= weights.sum()
+
+        return weights.astype(np.float32)
+
+    def get_curriculum_weights(self, epoch: int, max_epochs: int, temp: float = 1.0) -> torch.tensor:
+        lengths = []
+        for i, kind, sub_idx in self._index_map:
+            if kind == "solve":
+                tokens = self._examples[i].solve["input_ids"]
+            elif kind == "up":
+                tokens = self._examples[i].unit_propagation[sub_idx]["input_ids"]
+            elif kind == "ac":
+                tokens = self._examples[i].analyze_conflict[sub_idx]["input_ids"]
+            else:
+                raise ValueError(f"Unknown kind: {kind}")
+
+            lengths.append(len(tokens))
+
+        weights = self.compute_weights(epoch, max_epochs, lengths, temp=temp)
+        return torch.from_numpy(weights)
+
+    def get_lengths(self) -> list[int]:
+        lengths = []
+        for i, kind, sub_idx in self._index_map:
+            if kind == "solve":
+                tokens = self._examples[i].solve["input_ids"]
+            elif kind == "up":
+                tokens = self._examples[i].unit_propagation[sub_idx]["input_ids"]
+            elif kind == "ac":
+                tokens = self._examples[i].analyze_conflict[sub_idx]["input_ids"]
+            else:
+                raise ValueError(f"Unknown kind: {kind}")
+            lengths.append(len(tokens))
+        return lengths

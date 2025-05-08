@@ -31,7 +31,7 @@ from src.dataset.dataloader_builder import DataloaderBuilder
 from src.model.registry import CommandRegistry
 from src.model.callbacks.eval import EvalCallback
 from src.model.callbacks.inference import InferenceCallback
-from src.model.lit_wrapper import LitWrapper
+from src.model.lit_module import LitTrainingModule
 
 
 @hydra.main(config_path="../config", config_name=config_name, version_base=None)
@@ -97,7 +97,7 @@ def main(cfg: DictConfig):
     llm = LLM(GPT(lit_cfg), preprocessor=preprocessor, config=lit_cfg)
     steps_per_epoch = len(datasets["train"]) // (cfg.data.dataloader.batch_size * cfg.train.trainer.accumulate_grad_batches)
     total_steps = steps_per_epoch * cfg.train.trainer.epochs
-    model = LitWrapper(llm, cfg, total_steps=total_steps)
+    model = LitTrainingModule(llm, cfg, total_steps=total_steps, datasets=datasets, dataloader_builder=loader_builder)
     model = torch.compile(model)
 
     # Wandb config.
@@ -127,19 +127,16 @@ def main(cfg: DictConfig):
         accelerator=cfg.general.accelerator,
         devices=cfg.general.devices,
         max_epochs=cfg.train.trainer.epochs,
+        gradient_clip_val=1.0,
         accumulate_grad_batches=cfg.train.trainer.accumulate_grad_batches,
-        precision="16-mixed",
+        precision="bf16-mixed",
         val_check_interval=cfg['train']['trainer']['val_check_interval'],
         callbacks=callbacks,
         logger=logger,
-        log_every_n_steps=cfg['train']['trainer']['log_every_n_step']
+        log_every_n_steps=cfg['train']['trainer']['log_every_n_step'],
+        reload_dataloaders_every_n_epochs=1,  # for curriculum
     )
-
-    trainer.fit(
-        model, 
-        train_dataloaders=dataloaders['train'],
-        val_dataloaders=dataloaders['val'],
-    )
+    trainer.fit(model) 
 
 
 if __name__ == "__main__":

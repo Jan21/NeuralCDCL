@@ -1,0 +1,140 @@
+defaults:  
+  - _self_  
+  - override hydra/hydra_logging: disabled  
+  - override hydra/job_logging: disabled  
+  
+hydra:  
+  output_subdir: null  
+  run:  
+    dir: .
+
+general:
+  project: "SAT_LLM"
+  run_name: "${now:%Y%m%d_%H%M%S}-GPT-${train.model.n_layer}x${train.model.n_head}x${train.model.n_embd}_bs${data.dataloader.batch_size}_ctx${train.model.block_size}"
+  accelerator: "auto"  # "cpu", "gpu", "tpu", "hpu", "auto"
+  devices: 1  # Number of devices to train on (int), which devices to train on (list or str), or "auto".
+  seed: 21
+
+paths:
+  root_dir: "runs/${general.run_name}"
+  checkpoint_dir: "${paths.root_dir}/checkpoints"
+  eval_results: "${paths.root_dir}/eval_results"
+  config_export: "${paths.root_dir}/config.yaml"
+  tokenizer: "tokenizer/tokenizer.json"
+  data: "data"
+
+data_generation:
+  defaults:
+    remap_vars_up_to: 25
+    train:
+      num_formulas: 100000
+      n_vars_range: [5, 15]
+      variance: 0.1
+      seed: 42
+    val:
+      num_formulas: 10000
+      n_vars_range: [5, 15]
+      variance: 0.1
+      seed: 53
+    test:
+      num_formulas: 10000
+      n_vars_range: [5, 15]
+      variance: 0.1
+      seed: 64
+    ood:
+      num_formulas: 5000
+      n_vars_range: [16, 25]
+      variance: 0.1
+      seed: 75
+
+data:
+  raw_files:
+    train: "${paths.data}/cdcl_data_train.json"
+    val: "${paths.data}/cdcl_data_val.json"
+    test: "${paths.data}/cdcl_data_test.json"
+    ood: "${paths.data}/cdcl_data_ood.json"
+
+  tokenized_files:
+    train: "${paths.data}/tokenized_train.pt"
+    val: "${paths.data}/tokenized_val.pt"
+    test: "${paths.data}/tokenized_test.pt"
+    ood: "${paths.data}/tokenized_ood.pt"
+
+  tokenization:
+    num_workers: 16
+    batch_size: 128
+
+  dataloader:
+    num_workers: 4
+    batch_size: 1
+
+tokens:
+  structural:
+    read_block: ["READ_BEGIN", "READ_END"]
+    write_block: ["WRITE_BEGIN", "WRITE_END"]
+    solve_block: ["SOLVE_BEGIN", "SOLVE_END"]
+    unit_prop_block: ["UNIT_PROPAGATION_BEGIN", "UNIT_PROPAGATION_END"]
+    analyze_conflict_block: ["ANALYZE_CONFLICT_BEGIN", "ANALYZE_CONFLICT_END"]
+    semantic_block: ["[", "]"]
+  
+  commands:
+    read:
+      assignments: "READ_ASSIGNMENTS"
+      clauses: "READ_CLAUSES"
+      learned_clauses: "READ_LEARNED_CLAUSES"
+      decision_levels: "READ_DECISION_LEVELS"
+      reason_clauses: "READ_REASON_CLAUSES"
+      conflict_clause: "READ_CONFLICT_CLAUSE"
+      level: "READ_LEVEL"
+
+    write:
+      assignments: "WRITE_ASSIGNMENTS"
+      reason_clauses: "WRITE_REASON_CLAUSES"
+      decision_levels: "WRITE_DECISION_LEVELS"
+      learned_clauses: "WRITE_LEARNED_CLAUSES"
+      backtrack_level: "WRITE_BACKTRACK_LEVEL"
+      conflict_clause: "WRITE_CONFLICT_CLAUSE"
+
+    action:
+      backtrack: "BACKTRACK"
+      level_up: "LEVEL_UP"
+      unit_propagation: "CALL_UNIT_PROPAGATION"
+      analyze_conflict: "CALL_ANALYZE_CONFLICT"
+
+  labels:
+    counter_unit_token: "I"
+    sat_token: "SAT"
+    unsat_token: "UNSAT"
+
+train:
+  model:
+    n_layer: 1
+    n_head: 2
+
+    n_embd: 4
+    block_size: 600
+
+  optimizer:
+    warmup_steps: 25
+    peak_lr: 1e-4
+    min_lr: 1e-8
+    weight_decay: 0.01
+    betas: [0.9, 0.999]
+
+  trainer:
+    accumulate_grad_batches: 4
+    epochs: 20
+    val_check_interval: 0.2
+    log_every_n_step: 2
+
+  callbacks:
+    inference_sample_size: 3
+    inference_max_steps: 21000
+
+  dataset:
+    kind: "ac"    # options: null (default, meaning all kinds), or "solve", "up", "ac", or ["solve", "up"]
+    curriculum_temp: 1.5
+    n_examples_train: 100
+    n_examples_val: 5
+    n_examples_test: 0
+    n_examples_ood: 5

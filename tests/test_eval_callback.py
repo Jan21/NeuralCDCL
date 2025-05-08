@@ -21,9 +21,9 @@ def test_eval_callback_basic(cfg, tokenizer):
     registry = CommandRegistry(cfg, tokenizer)
 
     # Set up dummy trace type tokens
-    registry.solve_block_markers = [99]
-    registry.up_block_markers = [77]
-    registry.ac_block_markers = [55]
+    registry.tokens['structural']['solve'] = (99, 0)
+    registry.tokens['structural']['up'] = (77, 1)
+    registry.tokens['structural']['ac'] = (55, 2)
 
     # Prepare dummy batch: one solve, one up, one ac
     B = 3

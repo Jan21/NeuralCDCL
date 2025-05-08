@@ -1,6 +1,6 @@
 import os
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import Sampler, DataLoader
 from src.dataset.dataset import TokenizedDataset
 from src.model.registry import CommandRegistry
 from typing import Optional
@@ -34,11 +34,12 @@ class DataloaderBuilder:
             "labels": labels
         }
 
-    def build_dataloader(self, dataset: TokenizedDataset, shuffle: bool) -> DataLoader:
+    def build_dataloader(self, dataset: TokenizedDataset, shuffle: bool = False, sampler: Sampler = None) -> DataLoader:
         return DataLoader(
             dataset,
             batch_size=self._batch_size,
             shuffle=shuffle,
+            sampler=sampler,
             num_workers=self._num_workers,
             collate_fn=self._collate_fn,
             pin_memory=(self._device.type == "cuda"),

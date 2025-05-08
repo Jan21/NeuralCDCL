@@ -217,8 +217,8 @@ def encode_number_unary(num: int) -> str:
 
 def format_lit(literal: int) -> str:
     if literal < 0:
-        return f"-x{abs(literal)}"
-    return f"x{literal}"
+        return f"- x{abs(literal)}"
+    return f"+ x{literal}"
 
 def format_list(data, is_var=False, brackets=False, use_unary=False) -> str:
     # If it's just a single integer:
