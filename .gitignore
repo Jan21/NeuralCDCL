@@ -8,6 +8,7 @@ data/*.json
 data/*.pt
 !data/cdcl_data_debug.json
 !data/tokenized_debug.pt
+config/config.yaml
 
 *.pbs
 checkpoints/
