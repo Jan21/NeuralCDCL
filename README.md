@@ -26,7 +26,7 @@ pip install -r requirements.txt
 Use the following script to create the training and evaluation datasets:
 
 ```bash
-python3 ./scripts/generate_data.py --n_vars_range 5 15 --num_formulas 100000 --remap_vars_up_to --split train
+python3 ./scripts/generate_data.py --n_vars_range 5 15 --num_formulas 100000 --remap_vars_up_to 25 --split train
 ```
 
 - For training: 100k samples, variable range 5–15, remap to 25, seed to 42.
