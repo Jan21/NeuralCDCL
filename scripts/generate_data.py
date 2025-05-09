@@ -69,7 +69,7 @@ def main(cfg: DictConfig):
 
         trace = solver.tracer.get_trace()
         if cli_args.remap_vars_up_to != 0:
-            trace = remap_full_trace(trace, n_vars, remap_up_to=cli_args.remap_vars_up_to)
+            trace = remap_full_trace(trace, n_vars, remap_up_to=cli_args.remap_vars_up_to, method='shift')
         traces.append(trace)
     sat_ratio = n_sat / len(formulas)
     print(f'SAT/UNSAT ratio = {sat_ratio}')
