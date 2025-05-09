@@ -28,7 +28,7 @@ def remap_full_trace(
         mapping = {i: new_indices[i - 1] for i in range(1, n_vars + 1)}
         remapper = lambda s: remap_trace_variables(s, n_vars, mapping)
     elif method == "shift":
-        remapper = lambda s: remap_trace_variables_shifted(s, n_vars, shift)
+        remapper = lambda s: remap_trace_variables_shifted(s, n_vars, remap_up_to, shift)
     else:
         raise ValueError(f"Unknown remap method: {method}")
 
@@ -69,17 +69,21 @@ def remap_trace_variables(trace_text: str, n: int, mapping: dict[int, int]) -> s
     return remapped_text
 
 
-def remap_trace_variables_shifted(trace_text: str, n: int, shift: int) -> str:
+def remap_trace_variables_shifted(trace_text: str, n: int, remap_up_to: int, shift: int) -> str:
     """
-    Remaps variables x1..xn to x{1+shift}..x{n+shift}, wrapping around if shift is large.
+    Remaps variables x1..xn to x{i+shift}, ensuring new indices do not exceed remap_up_to.
 
     Args:
-        trace_text (str): The trace as text.
-        n (int): Number of variables in the trace.
-        shift (int): Integer amount to shift variable indices.
+        trace_text (str): Input trace string with variables like x1, x2, etc.
+        n (int): Number of original variables (x1 to xn).
+        remap_up_to (int): Maximum allowed index after shift.
+        shift (int): Shift amount to apply to variable indices.
 
     Returns:
-        str: The remapped trace string.
+        str: Trace with remapped variable indices.
+
+    Raises:
+        ValueError: If any shifted variable index exceeds remap_up_to.
     """
     pattern = re.compile(r"(-?)x(\d+)")
 
@@ -90,12 +94,13 @@ def remap_trace_variables_shifted(trace_text: str, n: int, shift: int) -> str:
         if not (1 <= old_index <= n):
             return match.group(0)
 
-        # Apply shift and wrap around to stay within 1..n
-        new_index = ((old_index - 1 + shift) % n) + 1
+        new_index = old_index + shift
+        if new_index > remap_up_to:
+            raise ValueError(f"Shifted variable x{old_index} -> x{new_index} exceeds remap_up_to={remap_up_to}")
+
         return f"{sign}x{new_index}"
 
     return pattern.sub(replace_var, trace_text)
-
 
 
 def generate_random_formula(n_vars: int, clause_length: int = 3, variance: float = 0.1, n_clauses: Optional[int] = None):
