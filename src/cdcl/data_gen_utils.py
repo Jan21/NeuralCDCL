@@ -8,7 +8,6 @@ def remap_full_trace(
     n_vars: int,
     remap_up_to: int,
     method: str = "random",   # "random" or "shift"
-    shift: int = 1            # used only if method == "shift"
 ) -> dict[str, list[str] | list[list[str]]]:
     """
     Remaps all variable names in the trace using the specified method.
@@ -18,7 +17,6 @@ def remap_full_trace(
         n_vars: Number of original variables.
         remap_up_to: Used in "random" mode, max variable index allowed.
         method: "random" for random remap, "shift" for index shifting.
-        shift: Number of positions to shift when method == "shift".
 
     Returns:
         Remapped trace with updated variable indices.
@@ -28,6 +26,8 @@ def remap_full_trace(
         mapping = {i: new_indices[i - 1] for i in range(1, n_vars + 1)}
         remapper = lambda s: remap_trace_variables(s, n_vars, mapping)
     elif method == "shift":
+        max_valid_shift = remap_up_to - n_vars
+        shift = random.randint(1, max_valid_shift)
         remapper = lambda s: remap_trace_variables_shifted(s, n_vars, remap_up_to, shift)
     else:
         raise ValueError(f"Unknown remap method: {method}")
