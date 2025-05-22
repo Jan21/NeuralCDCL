@@ -42,15 +42,16 @@ class Tracer:
         ]
         self.current_analyze_trace.extend(trace) 
 
-    def on_analyze_conflict_iteration_end(self, queue: list, curr_level_vars: set, learned_lits: set, 
-                                          is_uip: bool, selected_var: Optional[int] = None, reason_clause: Optional[list] = None):
+    def on_analyze_conflict_iteration_end_1(self, queue: list, curr_level_vars: set, learned_lits: set, is_uip: bool, selected_var: Optional[int] = None, reason_clause: Optional[list] = None):
         trace = [
-            f"QUEUE {format_list(queue, is_var=True)}",
-            f"RESOLVING {format_lit(selected_var) if selected_var is not None else 'None'}",
-            f"REASON_CLAUSE {format_list(reason_clause, is_var=True) if reason_clause is not None else 'None'}",
-            f"CURRENT_LVL_VARS {format_list(list(curr_level_vars), is_var=True)}",
-            f"LEARNED_LITS {format_list(list(learned_lits), is_var=True)}",
             f"IS_UIP {str(int(is_uip))}",
+        ]
+        self.current_analyze_trace.extend(trace) 
+
+    def on_analyze_conflict_iteration_end_2(self, queue: list, curr_level_vars: set, learned_lits: set, is_uip: bool, selected_var: Optional[int] = None, reason_clause: Optional[list] = None):
+        trace = [
+            f"RESOLVING {format_lit(selected_var) if selected_var is not None else 'None'}",
+            f"REASON_CLAUSE {format_lit(selected_var)} IS {format_list(reason_clause, is_var=True) if reason_clause is not None else 'None'}",
         ]
         self.current_analyze_trace.extend(trace) 
 
@@ -70,6 +71,33 @@ class Tracer:
 
         self.analyze_conflict_traces.append(self.current_analyze_trace)
         self.current_analyze_trace = None
+
+    def on_analyze_conflict_checking_variable(self, var, decision_level):
+        trace = [
+            f"CHECKING_VAR {format_lit(var)} at DECISION_LEVEL {encode_number_unary(decision_level)}",
+        ]
+        self.current_analyze_trace.extend(trace)
+
+    def on_analyze_conflict_current_level_vars(self, current_level_vars):
+        trace = [
+            f"CURRENT_LEVEL_VARS {format_list(current_level_vars, is_var=True)}",
+        ]
+        self.current_analyze_trace.extend(trace)
+        pass
+
+    def on_analyze_conflict_learned_lits(self, var, assigned_var):
+        trace = f"LEARNED_LITS {'- ' + format_lit(var) if assigned_var else '+ ' + format_lit(var)}"
+        self.current_analyze_trace.append(trace)
+        pass
+
+    def on_analyze_conflict_current_level_lits(self, lits):
+        trace = [
+            f"CURRENT_LEVEL_LITS {format_list(lits, is_var=True)}",
+        ]
+        pass
+
+    def on_analyze_conflict_reason_true(self, queue):
+        pass
 
 
     ### UNIT_PROPAGATION TRACES ###

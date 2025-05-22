@@ -12,6 +12,7 @@ class CDCLSolver:
         self.reason_clauses = {}
         self.learned_clauses = []
         self.tracer = tracer
+        self.clause2id = {tuple(c):i for i,c in enumerate(clauses)}
         
     def solve(self):
         self.tracer.on_start(self.clauses)
@@ -28,6 +29,7 @@ class CDCLSolver:
                 self.tracer.on_solve_conflict_resolved()
                 self.backtrack(backtrack_level)
                 self.learned_clauses.append(learned_clause)
+                self.clause2id[tuple(learned_clause)] = len(self.clause2id)
             else:
                 n_vars, n_assigned_vars = self.count_variables(), len(self.assignments)
                 if n_assigned_vars == n_vars:
@@ -80,17 +82,19 @@ class CDCLSolver:
             # Process each literal in the current clause
             for lit in queue:
                 var = abs(lit)  # Get variable (removing sign)
-
+                self.tracer.on_analyze_conflict_checking_variable(var, self.decision_level.get(var))
                 # If variable was assigned at current level, add to current_level_vars
                 if self.decision_level.get(var) == self.level:
                     current_level_vars.add(var)
+                    self.tracer.on_analyze_conflict_current_level_vars(current_level_vars)
                 # If assigned at earlier level, add to learned clause
                 else:
                     learned_lits.add(-var if self.assignments[var] else var)
+                    self.tracer.on_analyze_conflict_learned_lits(var, self.assignments[var])
             
             # UIP condition: only one variable from current decision level remains
             if len(current_level_vars) <= 1:
-                self.tracer.on_analyze_conflict_iteration_end(queue, current_level_vars - {var}, learned_lits, True)
+                self.tracer.on_analyze_conflict_iteration_end_1(queue, current_level_vars - {var}, learned_lits, True)
                 break
                 
             # Get most recently assigned variable from current level
@@ -99,10 +103,11 @@ class CDCLSolver:
             
             # Get the clause that caused this variable's assignment
             reason = self.reason_clauses.get(var)
-            self.tracer.on_analyze_conflict_iteration_end(queue, current_level_vars, learned_lits, False, var, reason)
+            self.tracer.on_analyze_conflict_iteration_end_2(queue, current_level_vars, learned_lits, False, var, reason)
             if reason:
                 queue = [lit for lit in self.get_literals_from_clause(reason) 
                         if abs(lit) != var]
+                self.tracer.on_analyze_conflict_reason_true(queue)
         
         # Create set of literals from current level variables with opposite polarity
         current_level_lits = {-var if self.assignments[var] else var for var in current_level_vars}
