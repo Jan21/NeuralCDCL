@@ -33,6 +33,8 @@ def calculate_metrics(results_dict, tokenizer):
         
         gt_solutions_ids = data['gt_solutions_ids']
         predictions_ids = data['predictions_ids']
+        gt_solutions_ids = gt_solutions_ids[:len(predictions_ids)]
+        print("GT and PRED lengths: ", len(gt_solutions_ids), len(predictions_ids))
         
         for i in range(len(gt_solutions_ids)):
             gt_ids = gt_solutions_ids[i]
@@ -50,13 +52,13 @@ def calculate_metrics(results_dict, tokenizer):
                     has_mismatch = True
             
             # Only print mismatched samples once
-            if has_mismatch:
-                print(f"\nSample {i} - {matches}/{min_len} tokens matched:")
-                print(f"GT: {gt_ids}")
-                print(f"PRED: {pred_ids}")
-                print(f"GT decoded: {tokenizer.decode(gt_ids, skip_special_tokens=True)}")
-                print(f"PRED decoded: {tokenizer.decode(pred_ids, skip_special_tokens=True)}")
-                print("-" * 40)
+            # if has_mismatch:
+            #     # print(f"\nSample {i} - {matches}/{min_len} tokens matched:")
+            #     # print(f"GT: {gt_ids}")
+            #     # print(f"PRED: {pred_ids}")
+            # #     # print(f"GT decoded: {tokenizer.decode(gt_ids, skip_special_tokens=True)}")
+            # #     # print(f"PRED decoded: {tokenizer.decode(pred_ids, skip_special_tokens=True)}")
+            #     print("-" * 40)
 
             token_acc = matches / max(len(gt_ids), len(pred_ids)) if max(len(gt_ids), len(pred_ids)) > 0 else 1.0
             
@@ -127,23 +129,21 @@ def main(cfg: DictConfig):
         test_set = data.test_dataset
 
         search_token_id = tokenizer.encode(cfg.data.split_str, add_special_tokens=False)[0]
-        end_token_id = tokenizer.encode("solve-end", add_special_tokens=False)[0]
+        end_token_id = tokenizer.encode("AC-end", add_special_tokens=False)[0]
 
         # Initialize lists for this dataset
         solutions_text = []
         solutions_ids = []
         prompts_text = []
         prompts_ids = []
-        
         for sample in tqdm(test_set):
             input_ids = sample["input_ids"]
             try:
                 split_index = input_ids.index(search_token_id)
                 end_index = input_ids.index(end_token_id)
             except:
-                print(input_ids)
-                print(sample)
-                print(tokenizer.decode(input_ids, skip_special_tokens=True))
+                pass
+                # print(tokenizer.decode(input_ids, skip_special_tokens=True))
             # Take everything up to "begin" token
             prompt_ids = input_ids[: split_index + 1]
 
@@ -156,6 +156,7 @@ def main(cfg: DictConfig):
             prompt_with_bos = tokenizer.encode(
                 full_prompt, add_special_tokens=False
             )
+        
             solution_ids = input_ids[split_index+1:end_index+1]
 
             prompts_ids.append(prompt_with_bos)
@@ -188,7 +189,7 @@ def main(cfg: DictConfig):
                     input_ids=input_prompt,
                     pad_token_id=tokenizer.pad_token_id,
                     attention_mask=inputs["attention_mask"].to("cuda"),
-                    max_length=cfg.model.block_size,
+                    max_length=4096,
                     num_beams=1,
                     do_sample=False,
                     eos_token_id=tokenizer.eos_token_id,
@@ -201,8 +202,12 @@ def main(cfg: DictConfig):
                 try:
                     split_index = output_ids.index(search_token_id)
                     end_index = output_ids.index(end_token_id)
+                    # print("Input PROMPT: ", input_prompt.shape, "\n ", "-"*10)
+                    # print("Output IDS: ", output_ids, "\n ", "-"*10)
                 except:
-                    print(f"Unable to find {end_token_id} or {search_token_id}. Skipping example in {current_path}...")
+                    # print(f"Unable to find {end_token_id} or {search_token_id}. Skipping example in {current_path}...")
+                    # print("Input PROMPT: ", input_prompt.shape, "\n ", "-"*10)
+                    # print("Output IDS: ", output_ids, "\n ", "-"*10)
                     continue
                 # Extract everything after the search token
                 generated_ids = output_ids[split_index+1:end_index+1]
@@ -244,6 +249,7 @@ def main(cfg: DictConfig):
         pickle.dump(results_dict, f)
 
     print(f"Complete results saved to {output_dir / 'results.pkl'}")    
+
 
 if __name__ == "__main__":
     main()

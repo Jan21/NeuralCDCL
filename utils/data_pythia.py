@@ -81,8 +81,10 @@ def get_data_for_inference(cfg, datapaths, tokenizer):
             "val": empty_dataset,
             "test": hf_dataset["test"]
         })
-
-        hf_dataset["test"] = hf_dataset["test"].select(range(int(1024)))
+        try:
+            hf_dataset["test"] = hf_dataset["test"].select(range(int(256)))
+        except:
+            print(f"Warning: Unable to select 256 examples from {test_path}. Using all available examples.")
 
         def tokenize(examples):
             texts = [
@@ -130,7 +132,7 @@ def get_data(cfg: DictConfig, tokenizer):
         },
     )
 
-    hf_dataset["test"] = hf_dataset["test"].select(range(int(512)))
+    # hf_dataset["test"] = hf_dataset["test"].select(range(int(128)))
 
     def tokenize(examples):
         texts = [

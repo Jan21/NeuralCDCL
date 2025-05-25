@@ -69,9 +69,10 @@ def log_reasons(clauses,clause2id):
 
 
 class CDCLSolver:
-    def __init__(self, clauses):
+    def __init__(self, clauses,vars):
         self.clauses = clauses
-        self.clause2id = {tuple(c):f'c {i}' for i,c in enumerate(clauses)}
+        self.vars = vars
+        self.clause2id = {tuple(c):f'c {" ".join(str(i))}' for i,c in enumerate(clauses)}
         self.assignments = {}
         self.level = 0
         self.decision_level = {}
@@ -94,7 +95,7 @@ class CDCLSolver:
                 backtrack_level = self.find_backtrack_level(learned_clause)
                 self.backtrack(backtrack_level)
                 self.learned_clauses.append(learned_clause)
-                self.clause2id[tuple(learned_clause)] = f'c{len(self.clause2id)}'
+                self.clause2id[tuple(learned_clause)] = f'c {" ".join(str(len(self.clause2id)))}'
             else:
                 #self.trace.append(f'assignment length: {len(self.assignments)}')
                 
@@ -132,15 +133,19 @@ class CDCLSolver:
         return None
 
 
-
     def analyze_conflict(self, conflict_clause):
         trace = []
-        
-        trace.append(f"assignments: {log_assignments(self.assignments)}")
+        trace.append("ANALYZE_CONFLICT_BEGIN\nREAD_ASSIGNMENTS READ_BEGIN")
+        trace.append(f"{log_assignments(self.assignments)}")
+        trace.append("READ_END\nREAD_CLAUSES READ_BEGIN")
         trace.append(f"clauses: {log_clause_list(self.clauses + self.learned_clauses,self.clause2id)}")
-        trace.append(f"decision-level: {log_decision_level(self.decision_level)}")
-        trace.append(f"reason-clauses: {log_reasons(self.reason_clauses,self.clause2id)}")
-        trace.append(f"conflict-clause: {log_clause(conflict_clause,self.clause2id[tuple(conflict_clause)])}")
+        trace.append("READ_END\nREAD_DECISION_LEVELS READ_BEGIN")
+        trace.append(f"{log_decision_level(self.decision_level)}")
+        trace.append("READ_END\nREAD_REASON_CLAUSES READ_BEGIN")
+        trace.append(f"{log_reasons(self.reason_clauses,self.clause2id)}")
+        trace.append("READ_END\nREAD_CONFLICT_CLAUSE READ_BEGIN")
+        trace.append(f"{log_clause(conflict_clause,self.clause2id[tuple(conflict_clause)])}")
+        trace.append("READ_END\n")
         trace.append("AC-begin")
         # Initialize sets to track variables at current decision level and literals for learned clause
         current_level_vars = set()  # Variables assigned at current decision level
@@ -163,13 +168,13 @@ class CDCLSolver:
                 else:
                     learned_lits.add(-var if self.assignments[var] else var)
                     var_str = log_var(var)
-                    trace.append(f"learned-lits: { "- " + var_str if self.assignments[var] else "+ " + var_str}") #TODO
+                    trace.append(f"learned-lits: { '- ' + var_str if self.assignments[var] else '+ ' + var_str}") #TODO
             
             # UIP condition: only one variable from current decision level remains
             if len(current_level_vars) <= 1:
                 trace.append("UIP")
                 break
- 
+
                 
             # Get most recently assigned variable from current level
             var = self.get_latest_assigned(current_level_vars)
@@ -188,10 +193,72 @@ class CDCLSolver:
         current_level_lits = [-var if self.assignments[var] else var for var in current_level_vars]
         trace.append(f"current-level-lits: {log_queue(current_level_lits)}")
         new_clause =list(learned_lits.union(set(current_level_lits))) # TODO check if this is correct'
-        trace.append(f"new-clause: {log_new_clause(new_clause)}")
+        # trace.append(f"new-clause: {log_new_clause(new_clause)}")
+        trace.append(f"\nWRITE_BACKTRACK_LEVEL WRITE_BEGIN {log_new_clause(new_clause)} WRITE_END\nANALYZE_CONFLICT_END")
         trace.append("AC-end")
         self.trace.append(trace)
+        
         return new_clause
+    
+    # def analyze_conflict(self, conflict_clause):
+    #     trace = []
+        
+    #     trace.append(f"assignments: {log_assignments(self.assignments)}")
+    #     trace.append(f"clauses: {log_clause_list(self.clauses + self.learned_clauses,self.clause2id)}")
+    #     trace.append(f"decision-level: {log_decision_level(self.decision_level)}")
+    #     trace.append(f"reason-clauses: {log_reasons(self.reason_clauses,self.clause2id)}")
+    #     trace.append(f"conflict-clause: {log_clause(conflict_clause,self.clause2id[tuple(conflict_clause)])}")
+    #     trace.append("AC-begin")
+    #     # Initialize sets to track variables at current decision level and literals for learned clause
+    #     current_level_vars = set()  # Variables assigned at current decision level
+    #     learned_lits = set()        # Literals that will form the learned clause
+
+    #     # Start with literals from the conflict clause
+    #     queue = self.get_literals_from_clause(conflict_clause) #
+    #     trace.append(f"queue: {log_queue(queue)}")
+    #     while True:
+    #         # Process each literal in the current clause
+    #         for lit in queue:
+    #             var = abs(lit)  # Get variable (removing sign)
+    #             trace.append(f"checking-variable: {log_var(var)} at {self.decision_level.get(var)}")
+                
+    #             # If variable was assigned at current level, add to current_level_vars
+    #             if self.decision_level.get(var) == self.level:
+    #                 current_level_vars.add(var)
+    #                 trace.append(f"current-level-vars: {log_current_level_vars(current_level_vars)}") #TODO
+    #             # If assigned at earlier level, add to learned clause
+    #             else:
+    #                 learned_lits.add(-var if self.assignments[var] else var)
+    #                 var_str = log_var(var)
+    #                 trace.append(f"learned-lits: { '- ' + var_str if self.assignments[var] else '+ ' + var_str}") #TODO
+            
+    #         # UIP condition: only one variable from current decision level remains
+    #         if len(current_level_vars) <= 1:
+    #             trace.append("UIP")
+    #             break
+ 
+                
+    #         # Get most recently assigned variable from current level
+    #         var = self.get_latest_assigned(current_level_vars)
+    #         trace.append(f"latest-assigned: {log_var(var)}")
+    #         current_level_vars.remove(var)
+            
+    #         # Get the clause that caused this variable's assignment
+    #         reason = self.reason_clauses.get(var)
+    #         trace.append(f"reason-for {log_var(var)} is {self.clause2id[tuple(reason)]}") #TODO
+    #         if reason:
+    #             queue = [lit for lit in self.get_literals_from_clause(reason) 
+    #                     if abs(lit) != var]
+    #             trace.append(f"queue: {log_queue(queue)}") # TODO
+        
+    #     # Create set of literals from current level variables with opposite polarity
+    #     current_level_lits = [-var if self.assignments[var] else var for var in current_level_vars]
+    #     trace.append(f"current-level-lits: {log_queue(current_level_lits)}")
+    #     new_clause =list(learned_lits.union(set(current_level_lits))) # TODO check if this is correct'
+    #     trace.append(f"new-clause: {log_new_clause(new_clause)}")
+    #     trace.append("AC-end")
+    #     self.trace.append(trace)
+    #     return new_clause
 
     def backtrack(self, level):
         #self.trace.append("BT begin")
@@ -259,7 +326,7 @@ class CDCLSolver:
         return goto
 
     def pick_branching_variable(self):
-        for var in range(1, self.count_variables() + 1):
+        for var in self.vars:
             if var not in self.assignments:
                 return var
         return None
@@ -290,24 +357,32 @@ def generate_random_formula(n_vars: int, clause_length: int = 3, variance: float
         base = balanced_n_clauses.get(n_vars, int(n_vars * 4.26))
         delta = int(base * variance)
         n_clauses = random.randint(base - delta, base + delta)
-
-    var_range = range(1, n_vars + 1)
+    interval_start = random.randint(1, 26 - n_vars)
+    var_range = range(interval_start, interval_start + n_vars + 1)
     clauses = []
     for _ in range(n_clauses):
         clause_vars = random.sample(var_range, clause_length)
         clause = [var if random.random() < 0.5 else -var for var in clause_vars]
         clauses.append(clause)
-    return clauses
+    return (clauses, var_range)
 
  ######## TEST
 formulas = []
-for i in tqdm(range(100000)):
-    num_vars = random.randint(5, 15)
+# for i in tqdm(range(5000)):
+#     num_vars = 20
+#     formulas.append(generate_random_formula(num_vars))
+
+for i in tqdm(range(2000)):
+    num_vars = 24
     formulas.append(generate_random_formula(num_vars))
+
+# for i in tqdm(range(2000)):
+#     num_vars = random.randint(16, 25)
+#     formulas.append(generate_random_formula(num_vars))
 
 
 traces =  []
-for clauses in tqdm(formulas):
+for clauses, vars in tqdm(formulas):
     g = Glucose3()
     for clause in clauses:
         g.add_clause(clause)
@@ -315,7 +390,7 @@ for clauses in tqdm(formulas):
     g.delete()
 
 
-    solver = CDCLSolver(clauses)
+    solver = CDCLSolver(clauses,vars)
     is_satisfiable = solver.solve()
     traces += solver.trace
     assert is_sat_pysat == is_satisfiable
@@ -357,9 +432,9 @@ import json
 train_data = [{"text": trace} for trace in train_traces]
 test_data = [{"text": trace} for trace in test_traces]
 
-# Save to JSON files
-with open('train_CA.json', 'w') as f:
-    json.dump(train_data, f)
+# # Save to JSON files
+# with open('train_CA.json', 'w') as f:
+#     json.dump(train_data, f)
 
 with open('test_CA.json', 'w') as f:
     json.dump(test_data, f)

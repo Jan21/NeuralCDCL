@@ -42,8 +42,11 @@ def get_vocab(cfg: DictConfig):
 
     with open(cfg.tok_data.val_file, "rb") as f:
         val = json.load(f)
+    
+    with open(cfg.tok_data.test_file, "rb") as f:
+        test = json.load(f)
 
-    data = train + val
+    data = train + val + test
     data = [i["text"] for i in data]
     data = " ".join(data)
     vocab = set(data.split())

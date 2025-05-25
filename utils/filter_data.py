@@ -66,11 +66,20 @@ def main(cfg: DictConfig):
     total_removed = 0
     overall_max_length = 0
 
+    # files_to_process = [
+    #     cfg.tok_data.train_file,
+    #     cfg.tok_data.val_file,
+    #     cfg.tok_data.test_file,
+    # ]
+    
+    # files to process will be all paths from directory data/generalization
     files_to_process = [
-        cfg.tok_data.train_file,
-        cfg.tok_data.val_file,
-        cfg.tok_data.test_file,
+        os.path.join(cfg.inference.datapath, file)
+        for file in os.listdir(cfg.inference.datapath) 
+        if file.endswith(".json")
     ]
+    print(f"Files to process: {files_to_process}")
+    # Process each file
 
     for file_path in files_to_process:
         removed, max_length = process_and_save_file(
