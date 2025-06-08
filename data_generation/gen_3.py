@@ -2,6 +2,7 @@ from pysat.solvers import Glucose3
 import random
 from tqdm import tqdm
 from typing import Optional
+import json
 
 def log_var(var):
     return f"x{var}"
@@ -68,11 +69,14 @@ def log_reasons(clauses,clause2id):
     return string[:-3]
 
 
+def log_int(i):
+    return ' '.join(str(i))
+
 class CDCLSolver:
     def __init__(self, clauses,vars):
         self.clauses = clauses
         self.vars = vars
-        self.clause2id = {tuple(c):f'c {" ".join(str(i))}' for i,c in enumerate(clauses)}
+        self.clause2id = {tuple(c):f'c {log_int(i)}' for i,c in enumerate(clauses)}
         self.assignments = {}
         self.level = 0
         self.decision_level = {}
@@ -80,123 +84,156 @@ class CDCLSolver:
         self.reason_clauses = {}
         self.learned_clauses = []
         self.trace = []
+        self.ret_dic = {"input_clauses": self.clause2id, 
+                   "solve_traces": [],
+                   "unit_prop_traces": [],
+                   "analyze_conflict_traces": [],}
         
     def solve(self):
-        #self.trace.append(f"num vars: {self.count_variables()}")
         while True:
-            #self.trace.append(f"current level: {self.level}")
-            #self.trace.append(f'current assignment: {self.assignments}') #TODO
+            trace = [f"SOLVE_BEGIN"]
+            trace.append(f"\nCALL_UNIT_PROPAGATION")
             conflict = self.unit_propagate()
+            trace.append(f"\nREAD_ASSIGNMENTS READ_BEGIN {log_assignments(self.assignments)} READ_END")
+            trace.append(f"\nREAD_CLAUSES READ_BEGIN {log_clause_list(self.clauses + self.learned_clauses,self.clause2id)} READ_END")
+            trace.append(f"\nREAD_DECISION_LEVELS READ_BEGIN {log_decision_level(self.decision_level)} READ_END")
+            trace.append(f"\nREAD_LEVEL READ_BEGIN {log_int(self.level)} READ_END")
             if conflict:
+                trace.append(f"\nREAD_CONFLICT_CLAUSE READ_BEGIN {log_clause(conflict,self.clause2id[tuple(conflict)])} READ_END")
+                trace.append("SPLIT_BEGIN")
                 if self.level == 0:
-                    #self.trace.append("UNSAT")
+                    trace.extend(["UNSAT", "\nSOLVE_END"])
+                    self.ret_dic["solve_traces"].append(trace)
                     return False
+                trace.append(f"\nCALL_ANALYZE_CONFLICT")
                 learned_clause = self.analyze_conflict(conflict)
-                backtrack_level = self.find_backtrack_level(learned_clause)
+                trace.append(f"\nREAD_LEARNED_CLAUSE READ_BEGIN {log_new_clause(learned_clause)} READ_END")
+                backtrack_level,trace_backtrack = self.find_backtrack_level(learned_clause)
+                trace.extend(trace_backtrack)
+                #trace.append(f"\nREAD_BACKTRACK_LEVEL {backtrack_level} READ END")
                 self.backtrack(backtrack_level)
                 self.learned_clauses.append(learned_clause)
-                self.clause2id[tuple(learned_clause)] = f'c {" ".join(str(len(self.clause2id)))}'
+                self.clause2id[tuple(learned_clause)] = f"c {' '.join(str(len(self.clause2id)))}"
             else:
-                #self.trace.append(f'assignment length: {len(self.assignments)}')
-                
+                trace.append(f"\nCONFLICT 0")
+                trace.append("SPLIT_BEGIN")
+                trace.append(f'\nN_VARS_TOTAL {len(self.assignments)}')
                 if len(self.assignments) == self.count_variables():
-                    #self.trace.append("SAT")
+                    trace.extend(["SAT", "\nSOLVE_END"])
+                    self.ret_dic["solve_traces"].append(trace)
                     return True
                 var = self.pick_branching_variable()
+                trace.append(f"\nBRANCHING_VARIABLE {log_var(var)}")
                 if var is None:
                     return True
                 self.level += 1
                 self.assign(var, True, None)
-                #self.trace.append(f'variable assigned: x{var} = {True} at level {self.level} by branching')
+                trace.append(f"\nWRITE_ASSIGNMENTS WRITE_BEGIN x{var} = {True} WRITE_END")
+                trace.append(f"\nWRITE_DECISION_LEVELS WRITE_BEGIN {self.level} WRITE_END")
+            trace.append("END ")
+            self.ret_dic["solve_traces"].append(trace)
 
     def unit_propagate(self,):
-        #self.trace.append("UP begin")
+        trace = []
+        trace.append("UNIT_PROPAGATION_BEGIN")
+        trace.append(f"\nREAD_ASSIGNMENTS READ_BEGIN {log_assignments(self.assignments)} READ_END")
+        trace.append(f"\nREAD_CLAUSES READ_BEGIN {log_clause_list(self.clauses + self.learned_clauses, self.clause2id)} READ_END")
+        trace.append(f"\nUP_BEGIN")
         while True:
-            #self.trace.append('UP iteration')
+            trace.append('SPLIT_BEGIN')
             propagated = False
-            for clause in self.clauses + self.learned_clauses:
+            for i,clause in enumerate(self.clauses + self.learned_clauses):
                 status, value = self.evaluate_clause(clause)
+                trace.append(f"EVALUATE_CLAUSE {log_clause(clause,self.clause2id[tuple(clause)])}")
                 if status and not value:
-                    #self.trace.append(f"found conflict: {clause}") #TODO
+                    trace.append([
+                        f"\nWRITE_CONFLICT_CLAUSE WRITE_BEGIN c {' '.join(str(i))} WRITE_END",
+                        f"\nUNIT_PROPAGATION_END",
+                    ])
+                    self.ret_dic["unit_prop_traces"].append(trace)
+                    propagated = False
                     return clause
                 elif self.is_unit(clause):
-                    #self.trace.append(f'unit found: {clause}') # TODO convert clause
+                    trace.append(f'PROPAGATED') # : {log_clause(clause)}') # TODO convert clause
+                    #self.trace.append('UP end')
                     lit = self.get_unassigned_literal(clause)
                     var = abs(lit)
                     value = lit > 0
-                    #self.trace.append(f'variable assigned: x{var} = {value} at level {self.level} because of reason {clause}') #TODO
-                    self.assign(var, value, clause)
                     propagated = True
+                    #return clause
+                    trace.append(f'\nWRITE_ASSIGNMENTS WRITE_BEGIN x{var} = {value} WRITE_END') #TODO
+                    self.assign(var, value, clause)
+                    trace.append(f"\nWRITE_DECISION_LEVELS WRITE_BEGIN {self.level} WRITE_END")
+                    trace.append(f"\nWRITE_REASON_CLAUSES WRITE_BEGIN c {' '.join(str(i))} WRITE_END")
+                    
             if not propagated:
-                #self.trace.append("nothing propagated")
+                trace.append("\nNOTHING_PROPAGATED")
                 break
+        trace.append("END")
+        self.ret_dic["unit_prop_traces"].append(trace)
         return None
 
 
     def analyze_conflict(self, conflict_clause):
         trace = []
-        trace.append("ANALYZE_CONFLICT_BEGIN\nREAD_ASSIGNMENTS READ_BEGIN")
-        trace.append(f"{log_assignments(self.assignments)}")
-        trace.append("READ_END\nREAD_CLAUSES READ_BEGIN")
-        trace.append(f"clauses: {log_clause_list(self.clauses + self.learned_clauses,self.clause2id)}")
-        trace.append("READ_END\nREAD_DECISION_LEVELS READ_BEGIN")
-        trace.append(f"{log_decision_level(self.decision_level)}")
-        trace.append("READ_END\nREAD_REASON_CLAUSES READ_BEGIN")
-        trace.append(f"{log_reasons(self.reason_clauses,self.clause2id)}")
-        trace.append("READ_END\nREAD_CONFLICT_CLAUSE READ_BEGIN")
-        trace.append(f"{log_clause(conflict_clause,self.clause2id[tuple(conflict_clause)])}")
-        trace.append("READ_END\n")
-        trace.append("AC-begin")
+        trace.append("ANALYZE_CONFLICT_BEGIN")
+        trace.append(f"\nREAD_ASSIGNMENTS READ_BEGIN {log_assignments(self.assignments)} READ_END")
+        trace.append(f"\nREAD_CLAUSES READ_BEGIN {log_clause_list(self.clauses + self.learned_clauses,self.clause2id)} READ_END")
+        trace.append(f"\nREAD_DECISION_LEVELS READ_BEGIN {log_decision_level(self.decision_level)} READ_END")
+        trace.append(f"\nREAD_REASON_CLAUSES READ_BEGIN {log_reasons(self.reason_clauses,self.clause2id)} READ_END")
+        trace.append(f"\nREAD_CONFLICT_CLAUSE READ_BEGIN {log_clause(conflict_clause,self.clause2id[tuple(conflict_clause)])} READ_END")
+        trace.append("SPLIT_BEGIN")
         # Initialize sets to track variables at current decision level and literals for learned clause
         current_level_vars = set()  # Variables assigned at current decision level
         learned_lits = set()        # Literals that will form the learned clause
 
         # Start with literals from the conflict clause
         queue = self.get_literals_from_clause(conflict_clause) #
-        trace.append(f"queue: {log_queue(queue)}")
+        trace.append(f"\QUEUE {log_queue(queue)}")
         while True:
             # Process each literal in the current clause
             for lit in queue:
                 var = abs(lit)  # Get variable (removing sign)
-                trace.append(f"checking-variable: {log_var(var)} at {self.decision_level.get(var)}")
+                trace.append(f"\nCHECKING_VARIABLE {log_var(var)} AT_LEVEL {self.decision_level.get(var)}")
                 
                 # If variable was assigned at current level, add to current_level_vars
                 if self.decision_level.get(var) == self.level:
                     current_level_vars.add(var)
-                    trace.append(f"current-level-vars: {log_current_level_vars(current_level_vars)}") #TODO
+                    trace.append(f"\nCURRENT_LEVEL_VARS {log_current_level_vars(current_level_vars)}") #TODO
                 # If assigned at earlier level, add to learned clause
                 else:
                     learned_lits.add(-var if self.assignments[var] else var)
                     var_str = log_var(var)
-                    trace.append(f"learned-lits: { '- ' + var_str if self.assignments[var] else '+ ' + var_str}") #TODO
+                    trace.append(f"\nLEARNED_LITS { '- ' + var_str if self.assignments[var] else '+ ' + var_str}") #TODO
             
             # UIP condition: only one variable from current decision level remains
             if len(current_level_vars) <= 1:
-                trace.append("UIP")
+                trace.append("\nUIP")
                 break
 
                 
             # Get most recently assigned variable from current level
             var = self.get_latest_assigned(current_level_vars)
-            trace.append(f"latest-assigned: {log_var(var)}")
+            trace.append(f"\nLATEST_ASSIGNED: {log_var(var)}")
             current_level_vars.remove(var)
             
             # Get the clause that caused this variable's assignment
             reason = self.reason_clauses.get(var)
-            trace.append(f"reason-for {log_var(var)} is {self.clause2id[tuple(reason)]}") #TODO
+            trace.append(f"\nREASON_FOR {log_var(var)} IS {self.clause2id[tuple(reason)]}") #TODO
             if reason:
                 queue = [lit for lit in self.get_literals_from_clause(reason) 
                         if abs(lit) != var]
-                trace.append(f"queue: {log_queue(queue)}") # TODO
+                trace.append(f"\nQUEUE {log_queue(queue)}") # TODO
         
         # Create set of literals from current level variables with opposite polarity
         current_level_lits = [-var if self.assignments[var] else var for var in current_level_vars]
-        trace.append(f"current-level-lits: {log_queue(current_level_lits)}")
+        trace.append(f"\nCURRENT_LEVEL_LITS: {log_queue(current_level_lits)}")
         new_clause =list(learned_lits.union(set(current_level_lits))) # TODO check if this is correct'
         # trace.append(f"new-clause: {log_new_clause(new_clause)}")
-        trace.append(f"\nWRITE_BACKTRACK_LEVEL WRITE_BEGIN {log_new_clause(new_clause)} WRITE_END\nANALYZE_CONFLICT_END")
-        trace.append("AC-end")
-        self.trace.append(trace)
+        trace.append(f"\nWRITE_LEARNED_CLAUSES WRITE_BEGIN {log_new_clause(new_clause)} WRITE_END")
+        trace.append("END")
+        # self.trace.append(trace)
+        self.ret_dic["analyze_conflict_traces"].append(trace)
         
         return new_clause
 
@@ -253,18 +290,25 @@ class CDCLSolver:
     def get_latest_assigned(self, vars_set):
         return max(vars_set, key=lambda var: list(self.assignments.keys()).index(var))
 
+    def log_levels(self, levels):
+        string = '{ '
+        for level in levels:
+            string += f"{level} , "
+        return string[:-3] + ' }'
+    
     def find_backtrack_level(self, learned_clause):
-        #self.trace.append(f"FB begin")
+        trace = []
+        trace.append(f"FB_BEGIN")
         levels = [self.decision_level[abs(lit)] for lit in learned_clause 
                  if abs(lit) in self.decision_level]
-        #self.trace.append(f"levels: {levels}")
+        trace.append(f"LEVELS {self.log_levels(levels)}")
         if not levels:
-            self.trace.append("GOTO level: 0")
-            return 0
+            trace.append("GOTO_LEVEL 0")
+            return 0, trace
         levels.sort(reverse=True)
         goto = levels[1] if len(levels) > 1 else 0
-        #self.trace.append(f"GOTO level: {goto}")
-        return goto
+        trace.append(f"GOTO_LEVEL {goto}")
+        return goto, trace
 
     def pick_branching_variable(self):
         for var in self.vars:
@@ -307,22 +351,31 @@ def generate_random_formula(n_vars: int, clause_length: int = 3, variance: float
         clauses.append(clause)
     return (clauses, var_range)
 
- ######## TEST
+def format_trace_as_string(trace):
+    """Convert a trace (list of items) to a single string"""
+    if isinstance(trace, list):
+        # Join list elements, preserving any \n characters within strings
+        result = []
+        for item in trace:
+            if isinstance(item, list):
+                # Handle nested lists
+                result.append(" ; ".join(str(subitem) for subitem in item))
+            else:
+                result.append(str(item))
+        return " ; ".join(result)
+    else:
+        return str(trace)
+
+######## GENERATE FORMULAS
+print("Generating formulas...")
 formulas = []
-for i in tqdm(range(1000)):
-    num_vars = random.randint(5, 15)
+for i in tqdm(range(10000)):  # Increased to ensure enough traces for 1k test sets
+    num_vars = random.randint(16, 25)
     formulas.append(generate_random_formula(num_vars))
 
-# for i in tqdm(range(5000)):
-#     num_vars = 25
-#     formulas.append(generate_random_formula(num_vars))
-
-# for i in tqdm(range(2000)):
-#     num_vars = random.randint(16, 25)
-#     formulas.append(generate_random_formula(num_vars))
-
-
-traces =  []
+# Run solver and collect all traces
+print("Running solver and collecting traces...")
+all_traces = []
 for clauses, vars in tqdm(formulas):
     g = Glucose3()
     for clause in clauses:
@@ -330,14 +383,13 @@ for clauses, vars in tqdm(formulas):
     is_sat_pysat = g.solve()
     g.delete()
 
-
-    solver = CDCLSolver(clauses,vars)
+    solver = CDCLSolver(clauses, vars)
     is_satisfiable = solver.solve()
-    traces += solver.trace
+    all_traces.append(solver.ret_dic)
     assert is_sat_pysat == is_satisfiable
 
     if is_satisfiable:
-    # Verify CDCL solution using PySAT
+        # Verify CDCL solution using PySAT
         g_verify = Glucose3()
         for clause in clauses:
             g_verify.add_clause(clause)
@@ -345,40 +397,90 @@ for clauses, vars in tqdm(formulas):
         for var, value in solver.assignments.items():
             assumptions.append(var if value else -var)
         
-    # Check if solution satisfies formula
+        # Check if solution satisfies formula
         is_valid = g_verify.solve(assumptions=assumptions)
         assert is_valid
         g_verify.delete()
 
-trace_strs = []
-for trace in traces:
-    trace_str = " ; ".join(trace)
-    trace_strs.append(trace_str)
+######## RUN 1: ANALYZE CONFLICT TRACES ONLY
+print("Creating analyze conflict traces dataset...")
+ac_data = []
+for trace in all_traces:
+    for ac_trace in trace["analyze_conflict_traces"]:
+        trace_str = format_trace_as_string(ac_trace)
+        ac_data.append({"text": trace_str})
 
-trace_strs[0]
+# Split into train/test with 1k test examples
+random.shuffle(ac_data)
+test_size = 10240
+ac_test = ac_data[:test_size]
+ac_train = ac_data[test_size:400000]
 
+with open('ac_train.json', 'w') as f:
+    json.dump(ac_train, f, indent=2)
 
-num_traces = len(trace_strs)
-split_idx = int(0.90 * num_traces)
+with open('ac_test.json', 'w') as f:
+    json.dump(ac_test, f, indent=2)
 
-train_traces = trace_strs[:split_idx]
-test_traces = trace_strs[split_idx:]
+print(f"Saved {len(ac_train)} training and {len(ac_test)} test analyze conflict traces")
 
-print(f"Split {num_traces} traces into {len(train_traces)} training and {len(test_traces)} testing traces")
+######## RUN 2: UNIT PROPAGATION TRACES ONLY
+print("Creating unit propagation traces dataset...")
+up_data = []
+for trace in all_traces:
+    for up_trace in trace["unit_prop_traces"]:
+        trace_str = format_trace_as_string(up_trace)
+        up_data.append({"text": trace_str})
 
-# Save the splits to files
-import json
+# Split into train/test with 1k test examples
+random.shuffle(up_data)
+test_size = 10240  # Use 1k or 20% if less data available
+up_test = up_data[:test_size]
+up_train = up_data[test_size:400000]
 
-# Convert traces to the required format (dict with "text" key)
-train_data = [{"text": trace} for trace in train_traces]
-test_data = [{"text": trace} for trace in test_traces]
+with open('up_train.json', 'w') as f:
+    json.dump(up_train, f, indent=2)
 
-# # Save to JSON files
-# with open('train_CA.json', 'w') as f:
-#     json.dump(train_data, f)
+with open('up_test.json', 'w') as f:
+    json.dump(up_test, f, indent=2)
 
-with open('test_CA.json', 'w') as f:
-    json.dump(test_data, f)
+print(f"Saved {len(up_train)} training and {len(up_test)} test unit propagation traces")
 
-print(f"Saved training traces to train_traces.json")
-print(f"Saved testing traces to test_traces.json")
+######## RUN 3: MIXED TRACES (BOTH AC AND UP)
+print("Creating mixed traces dataset...")
+mixed_data = []
+
+# Add all analyze conflict traces
+for trace in all_traces:
+    for ac_trace in trace["analyze_conflict_traces"]:
+        trace_str = format_trace_as_string(ac_trace)
+        mixed_data.append({"text": trace_str})
+
+# Add all unit propagation traces
+for trace in all_traces:
+    for up_trace in trace["unit_prop_traces"]:
+        trace_str = format_trace_as_string(up_trace)
+        mixed_data.append({"text": trace_str})
+
+# Shuffle and split into train/test with 1k test examples
+random.shuffle(mixed_data)
+test_size = 10240  # Use 1k or 20% if less data available
+mixed_test = mixed_data[:test_size]
+mixed_train = mixed_data[test_size:600000]
+
+with open('mixed_train.json', 'w') as f:
+    json.dump(mixed_train, f, indent=2)
+
+with open('mixed_test.json', 'w') as f:
+    json.dump(mixed_test, f, indent=2)
+
+print(f"Saved {len(mixed_train)} training and {len(mixed_test)} test mixed traces")
+
+print("\nSummary:")
+print(f"- Analyze conflict: {len(ac_train)} train, {len(ac_test)} test")
+print(f"- Unit propagation: {len(up_train)} train, {len(up_test)} test") 
+print(f"- Mixed traces: {len(mixed_train)} train, {len(mixed_test)} test")
+print("\nFiles created:")
+print("- ac_train.json, ac_test.json")
+print("- up_train.json, up_test.json") 
+print("- mixed_train.json, mixed_test.json")

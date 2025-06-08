@@ -6,7 +6,7 @@ from transformers import AutoTokenizer, PreTrainedTokenizerFast
 import hydra
 from omegaconf import DictConfig, OmegaConf
 import numpy as np
-
+import glob
 @hydra.main(
     config_path="../config",
     config_name="config",
@@ -15,7 +15,7 @@ import numpy as np
 def main(cfg: DictConfig):
 
     tokenizer = get_tokenizer(cfg.tok_data)
-    tokenized_datasets = get_data(cfg, tokenizer)
+    tokenized_datasets = get_data_for_analysis(cfg, tokenizer)
     
     # Analyze token counts for each split
     for split in tokenized_datasets.keys():

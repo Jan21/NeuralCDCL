@@ -1,5 +1,6 @@
 import json
 import os
+import glob
 from tokenizers import Tokenizer
 import hydra
 from omegaconf import DictConfig
@@ -15,7 +16,11 @@ def filter_by_length(data: list, tokenizer: Tokenizer, max_length: int) -> list:
 
     print(f"\nFiltering examples longer than {max_length} tokens...")
     for example in tqdm(data):
-        tokens = tokenizer(example["text"])["input_ids"]
+        try:
+            tokens = tokenizer(example["text"])["input_ids"]
+        except:
+            print(f"Error tokenizing example: {example}")
+            continue
         token_length = len(tokens)
         max_found_length = max(max_found_length, token_length)
 
@@ -66,24 +71,15 @@ def main(cfg: DictConfig):
     total_removed = 0
     overall_max_length = 0
 
-    # files_to_process = [
-    #     cfg.tok_data.train_file,
-    #     cfg.tok_data.val_file,
-    #     cfg.tok_data.test_file,
-    # ]
+    # Get all JSON files from data directory and data/generalization directory
+    files_to_process = glob.glob("data/all/*.json")
     
-    # files to process will be all paths from directory data/generalization
-    files_to_process = [
-        os.path.join(cfg.inference.datapath, file)
-        for file in os.listdir(cfg.inference.datapath) 
-        if file.endswith(".json")
-    ]
     print(f"Files to process: {files_to_process}")
+    
     # Process each file
-
     for file_path in files_to_process:
         removed, max_length = process_and_save_file(
-            file_path, tokenizer, max_length=2048
+            file_path, tokenizer, max_length=4000
         )
         total_removed += removed
         overall_max_length = max(overall_max_length, max_length)

@@ -129,7 +129,7 @@ def main(cfg: DictConfig):
         test_set = data.test_dataset
 
         search_token_id = tokenizer.encode(cfg.data.split_str, add_special_tokens=False)[0]
-        end_token_id = tokenizer.encode("AC-end", add_special_tokens=False)[0]
+        end_token_id = tokenizer.encode("END", add_special_tokens=False)[0]
 
         # Initialize lists for this dataset
         solutions_text = []
@@ -249,7 +249,25 @@ def main(cfg: DictConfig):
         pickle.dump(results_dict, f)
 
     print(f"Complete results saved to {output_dir / 'results.pkl'}")    
+    # Auto-logging based on model folder name
+    model_name = model_dir.name
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log_file = f"{model_name}_metrics.log"
+    
+    # Append metrics to log file
+    with open(log_file, 'a') as f:
+        f.write(f"\n[{timestamp}] Evaluation for {model_name}\n")
+        f.write("Overall Metrics:\n")
+        for metric, value in overall_metrics.items():
+            f.write(f"{metric}: {value:.4f}\n")
+        f.write("Dataset Metrics:\n")
+        for datapath, metrics in dataset_metrics.items():
+            f.write(f"{os.path.basename(datapath)}:\n")
+            for metric, value in metrics.items():
+                f.write(f"  {metric}: {value:.4f}\n")
+        f.write("-" * 50 + "\n")
 
+    print(f"Metrics logged to {log_file}")
 
 if __name__ == "__main__":
     main()

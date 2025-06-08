@@ -9,7 +9,7 @@ import torch
 import json
 import hydra
 from omegaconf import DictConfig, OmegaConf
-
+import glob
 import os
 
 
@@ -37,17 +37,16 @@ def get_tokenizer(vocab, cfg):
 
 
 def get_vocab(cfg: DictConfig):
-    with open(cfg.tok_data.train_file, "rb") as f:
-        train = json.load(f)
-
-    with open(cfg.tok_data.val_file, "rb") as f:
-        val = json.load(f)
+    # Get all JSON files from data directory and data/generalization directory
+    data_files = glob.glob("data/ac/*.json") + glob.glob("data/up/*.json") + glob.glob("data/mixed/*.json") + glob.glob("data/generalization/up/*.json") + glob.glob("data/generalization/ac/*.json") + glob.glob("data/generalization/mixed/*.json")
     
-    with open(cfg.tok_data.test_file, "rb") as f:
-        test = json.load(f)
+    all_data = []
+    for file_path in data_files:
+        with open(file_path, "rb") as f:
+            file_data = json.load(f)
+            all_data.extend(file_data)
 
-    data = train + val + test
-    data = [i["text"] for i in data]
+    data = [i["text"] for i in all_data]
     data = " ".join(data)
     vocab = set(data.split())
     print("Num of tokens:", len(vocab))

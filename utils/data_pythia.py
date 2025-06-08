@@ -118,6 +118,42 @@ def get_data_for_inference(cfg, datapaths, tokenizer):
 
     return tokenized_datasets
 
+def get_data_for_analysis(cfg: DictConfig, tokenizer):
+    import glob
+    
+    # Get all JSON files from data directory and data/generalization directory
+    data_files = glob.glob("data/*.json") + glob.glob("data/generalization/*.json")
+    
+    # Create a dictionary mapping file names to their paths for the dataset
+    file_dict = {}
+    for file_path in data_files:
+        # Use filename without extension as the key
+        file_name = os.path.splitext(os.path.basename(file_path))[0]
+        file_dict[file_name] = file_path
+    
+    hf_dataset = load_dataset(
+        "json",
+        data_files=file_dict,
+    )
+
+    def tokenize(examples):
+        texts = [
+            tokenizer.bos_token + " " + ex + " " + tokenizer.eos_token for ex in examples["text"]
+        ]
+        outputs = tokenizer(
+            texts,
+            truncation=False,
+            padding=False,
+            return_overflowing_tokens=False,
+        )
+        return {"input_ids": outputs["input_ids"]}
+
+    tokenized_dataset = hf_dataset.map(
+        tokenize, batched=True, remove_columns=hf_dataset[list(hf_dataset.keys())[0]].column_names
+    )
+
+    return tokenized_dataset
+
 def get_data(cfg: DictConfig, tokenizer):
     train_file = to_absolute_path(os.path.join(cfg.data.datapath, cfg.data.train_file))
     val_file = to_absolute_path(os.path.join(cfg.data.datapath, cfg.data.val_file))
