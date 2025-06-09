@@ -14,20 +14,20 @@ data_preprocess:
   num_val: 2048
 
 tok_data:
-  train_file: "data/ac/ac_train.json"
-  val_file: "data/ac/ac_test.json"
-  test_file: "data/ac/ac_test.json"
+  train_file: "data/mixed/mixed_train.json"
+  val_file: "data/mixed/mixed_test.json"
+  test_file: "data/mixed/mixed_test.json"
   tokenizer_path: "tokenizer/tokenizer.json"
 
 data:
   datapath: data
-  train_file: "ac/ac_train.json"
-  val_file: "ac/ac_test.json"
+  train_file: "mixed/mixed_train.json"
+  val_file: "mixed/mixed_test.json"
   num_workers: 32
   split_str: "SPLIT_BEGIN"
 
 model:
-  name: "Pythia-${model.n_layer}-${model.n_head}-${model.n_embd}-ca"
+  name: "Pythia-${model.n_layer}-${model.n_head}-${model.n_embd}-mix"
   batch_size: 128
   accumulate_grad_batches: 1
   block_size: 4096
@@ -53,6 +53,6 @@ convert_hf:
   out_path: "temp/hf_${model.name}"
 
 inference:
-  modelpath: "./temp/hf_Pythia-12-16-256-ca_best"
+  modelpath: "./temp/hf_Pythia-12-16-256-mixed"
   datapath: ${data.datapath}/generalization/
   batch_size: 256

@@ -95,9 +95,7 @@ def main(cfg: DictConfig):
     num_workers = cfg.data.num_workers
     # get hf model for batch inference
     model_dir = Path(f"{cfg.inference.modelpath}")
-
     state_dict = torch.load(model_dir / "model.pth")
-
     hf_model = AutoModelForCausalLM.from_pretrained(
             model_dir,
             torch_dtype=torch.bfloat16,
