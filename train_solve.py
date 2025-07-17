@@ -39,6 +39,9 @@ class LitLLM(L.LightningModule):
         self.train_batches = train_batches
         self.delimiter_token_id = delimiter_token_id
         _, self.hf_conf = hf_config.get_configs(cfg)
+        self.read_learned_clause_token_id = self.preprocessor.tokenizer.encode("READ_LEARNED_CLAUSE", add_special_tokens=False)[0]
+        self.read_begin_token_id = self.preprocessor.tokenizer.encode("READ_BEGIN", add_special_tokens=False)[0]
+        self.read_end_token_id = self.preprocessor.tokenizer.encode("READ_END", add_special_tokens=False)[0]
 
     def setup(self, stage):
         self.preprocessor.tokenizer.save_pretrained(self.cfg.convert_hf.in_path)
@@ -46,7 +49,7 @@ class LitLLM(L.LightningModule):
             json.dump(self.hf_conf, f, indent=2)
 
     def mask_targets(self, input_ids, target_ids):
-        # Find positions with delimiter tokens
+        # Find positions with delimiter tokens (existing logic for SPLIT_BEGIN)
         delimiter_positions = (input_ids == self.delimiter_token_id)
         
         # Create a shifted version where positions after delimiter are marked
@@ -55,10 +58,60 @@ class LitLLM(L.LightningModule):
         first_search_pos[:, 1:] = delimiter_positions.cumsum(dim=1)[:, :-1].bool()
         
         # Create the mask - True for delimiter and positions before it
-        mask = ~first_search_pos.cumsum(dim=1).bool()
+        delimiter_mask = ~first_search_pos.cumsum(dim=1).bool()
+        
+        # Additional masking for READ_LEARNED_CLAUSE READ_BEGIN...READ_END sequences
+        read_learned_clause_positions = (input_ids == self.read_learned_clause_token_id)
+        read_begin_positions = (input_ids == self.read_begin_token_id)
+        read_end_positions = (input_ids == self.read_end_token_id)
+        
+        # Create position indices for vectorized operations
+        batch_size, seq_len = input_ids.shape
+        position_indices = torch.arange(seq_len, device=input_ids.device).unsqueeze(0).expand(batch_size, -1)
+        
+        # Initialize READ_BEGIN...READ_END mask
+        read_begin_end_mask = torch.zeros_like(input_ids, dtype=torch.bool)
+        
+        # For each READ_LEARNED_CLAUSE, find the next READ_BEGIN, then the next READ_END
+        for batch_idx in range(batch_size):
+            learned_clause_positions = torch.where(read_learned_clause_positions[batch_idx])[0]
+            begin_positions = torch.where(read_begin_positions[batch_idx])[0]
+            end_positions = torch.where(read_end_positions[batch_idx])[0]
+            
+            for learned_clause_pos in learned_clause_positions:
+                # Find the first READ_BEGIN after this READ_LEARNED_CLAUSE
+                valid_begin_positions = begin_positions[begin_positions > learned_clause_pos]
+                if len(valid_begin_positions) > 0:
+                    begin_pos = valid_begin_positions[0]
+                    # Find the first READ_END after this READ_BEGIN
+                    valid_end_positions = end_positions[end_positions > begin_pos]
+                    if len(valid_end_positions) > 0:
+                        end_pos = valid_end_positions[0]
+                        # Mask all positions from READ_BEGIN to READ_END (inclusive)
+                        mask_range = (position_indices[batch_idx] >= begin_pos) & (position_indices[batch_idx] <= end_pos)
+                        read_begin_end_mask[batch_idx] |= mask_range
+        
+        # Combine both masks (mask if either condition says to mask)
+        combined_mask = delimiter_mask | read_begin_end_mask
         
         # Apply the mask to targets, setting masked positions to -100
-        return torch.where(mask, torch.tensor(-100, device=target_ids.device), target_ids)
+        return torch.where(combined_mask, torch.tensor(-100, device=target_ids.device), target_ids)
+
+    # NORMAL:
+    # def mask_targets(self, input_ids, target_ids):
+    #     # Find positions with delimiter tokens
+    #     delimiter_positions = (input_ids == self.delimiter_token_id)
+        
+    #     # Create a shifted version where positions after delimiter are marked
+    #     # This will include the delimiter itself as True
+    #     first_search_pos = torch.zeros_like(input_ids, dtype=torch.bool)
+    #     first_search_pos[:, 1:] = delimiter_positions.cumsum(dim=1)[:, :-1].bool()
+        
+    #     # Create the mask - True for delimiter and positions before it
+    #     mask = ~first_search_pos.cumsum(dim=1).bool()
+        
+    #     # Apply the mask to targets, setting masked positions to -100
+    #     return torch.where(mask, torch.tensor(-100, device=target_ids.device), target_ids)
 
 
     # def mask_targets(self, input_ids, target_ids):

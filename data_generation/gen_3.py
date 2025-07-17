@@ -102,7 +102,7 @@ class CDCLSolver:
                 trace.append(f"\nREAD_CONFLICT_CLAUSE READ_BEGIN {log_clause(conflict,self.clause2id[tuple(conflict)])} READ_END")
                 trace.append("SPLIT_BEGIN")
                 if self.level == 0:
-                    trace.extend(["UNSAT", "\nSOLVE_END"])
+                    trace.extend(["UNSAT", "END"])
                     self.ret_dic["solve_traces"].append(trace)
                     return False
                 trace.append(f"\nCALL_ANALYZE_CONFLICT")
@@ -150,6 +150,7 @@ class CDCLSolver:
                         f"\nWRITE_CONFLICT_CLAUSE WRITE_BEGIN c {' '.join(str(i))} WRITE_END",
                         f"\nUNIT_PROPAGATION_END",
                     ])
+                    trace.append("END")
                     self.ret_dic["unit_prop_traces"].append(trace)
                     propagated = False
                     return clause
@@ -189,22 +190,22 @@ class CDCLSolver:
 
         # Start with literals from the conflict clause
         queue = self.get_literals_from_clause(conflict_clause) #
-        trace.append(f"\QUEUE {log_queue(queue)}")
+        trace.append(f"\QUEUE_BEGIN {log_queue(queue)} QUEUE_END")
         while True:
             # Process each literal in the current clause
             for lit in queue:
                 var = abs(lit)  # Get variable (removing sign)
-                trace.append(f"\nCHECKING_VARIABLE {log_var(var)} AT_LEVEL {self.decision_level.get(var)}")
+                trace.append(f"\nCHECKING_VARIABLE_BEGIN {log_var(var)} AT_LEVEL {self.decision_level.get(var)} CHECKING_VARIABLE_END")
                 
                 # If variable was assigned at current level, add to current_level_vars
                 if self.decision_level.get(var) == self.level:
                     current_level_vars.add(var)
-                    trace.append(f"\nCURRENT_LEVEL_VARS {log_current_level_vars(current_level_vars)}") #TODO
+                    trace.append(f"\nCURRENT_LEVEL_VARS_BEGIN {log_current_level_vars(current_level_vars)} CURRENT_LEVEL_VARS_END") #TODO
                 # If assigned at earlier level, add to learned clause
                 else:
                     learned_lits.add(-var if self.assignments[var] else var)
                     var_str = log_var(var)
-                    trace.append(f"\nLEARNED_LITS { '- ' + var_str if self.assignments[var] else '+ ' + var_str}") #TODO
+                    trace.append(f"\nLEARNED_LITS_BEGIN { '- ' + var_str if self.assignments[var] else '+ ' + var_str} LEARNED_LITS_END") #TODO
             
             # UIP condition: only one variable from current decision level remains
             if len(current_level_vars) <= 1:
@@ -214,20 +215,20 @@ class CDCLSolver:
                 
             # Get most recently assigned variable from current level
             var = self.get_latest_assigned(current_level_vars)
-            trace.append(f"\nLATEST_ASSIGNED: {log_var(var)}")
+            trace.append(f"\nLATEST_ASSIGNED_BEGIN {log_var(var)} LATEST_ASSIGNED_END")
             current_level_vars.remove(var)
             
             # Get the clause that caused this variable's assignment
             reason = self.reason_clauses.get(var)
-            trace.append(f"\nREASON_FOR {log_var(var)} IS {self.clause2id[tuple(reason)]}") #TODO
+            trace.append(f"\nREASON_FOR_BEGIN {log_var(var)} IS {self.clause2id[tuple(reason)]} REASON_FOR_END") #TODO
             if reason:
                 queue = [lit for lit in self.get_literals_from_clause(reason) 
                         if abs(lit) != var]
-                trace.append(f"\nQUEUE {log_queue(queue)}") # TODO
+                trace.append(f"\nQUEUE_2_BEGIN {log_queue(queue)} QUEUE_2_END") # TODO
         
         # Create set of literals from current level variables with opposite polarity
         current_level_lits = [-var if self.assignments[var] else var for var in current_level_vars]
-        trace.append(f"\nCURRENT_LEVEL_LITS: {log_queue(current_level_lits)}")
+        trace.append(f"\nCURRENT_LEVEL_LITS_BEGIN: {log_queue(current_level_lits)} CURRENT_LEVEL_LITS_END")
         new_clause =list(learned_lits.union(set(current_level_lits))) # TODO check if this is correct'
         # trace.append(f"new-clause: {log_new_clause(new_clause)}")
         trace.append(f"\nWRITE_LEARNED_CLAUSES WRITE_BEGIN {log_new_clause(new_clause)} WRITE_END")
@@ -369,8 +370,8 @@ def format_trace_as_string(trace):
 ######## GENERATE FORMULAS
 print("Generating formulas...")
 formulas = []
-for i in tqdm(range(10000)):  # Increased to ensure enough traces for 1k test sets
-    num_vars = random.randint(16, 25)
+for i in tqdm(range(100000)):
+    num_vars = random.randint(5, 15)
     formulas.append(generate_random_formula(num_vars))
 
 # Run solver and collect all traces
@@ -402,7 +403,7 @@ for clauses, vars in tqdm(formulas):
         assert is_valid
         g_verify.delete()
 
-######## RUN 1: ANALYZE CONFLICT TRACES ONLY
+# ######## RUN 1: ANALYZE CONFLICT TRACES ONLY
 print("Creating analyze conflict traces dataset...")
 ac_data = []
 for trace in all_traces:
@@ -424,63 +425,87 @@ with open('ac_test.json', 'w') as f:
 
 print(f"Saved {len(ac_train)} training and {len(ac_test)} test analyze conflict traces")
 
-######## RUN 2: UNIT PROPAGATION TRACES ONLY
-print("Creating unit propagation traces dataset...")
-up_data = []
-for trace in all_traces:
-    for up_trace in trace["unit_prop_traces"]:
-        trace_str = format_trace_as_string(up_trace)
-        up_data.append({"text": trace_str})
+# ######## RUN 2: UNIT PROPAGATION TRACES ONLY
+# print("Creating unit propagation traces dataset...")
+# up_data = []
+# for trace in all_traces:
+#     for up_trace in trace["unit_prop_traces"]:
+#         trace_str = format_trace_as_string(up_trace)
+#         up_data.append({"text": trace_str})
 
-# Split into train/test with 1k test examples
-random.shuffle(up_data)
-test_size = 10240  # Use 1k or 20% if less data available
-up_test = up_data[:test_size]
-up_train = up_data[test_size:400000]
+# # Split into train/test with 1k test examples
+# random.shuffle(up_data)
+# test_size = 10240  # Use 1k or 20% if less data available
+# up_test = up_data[:test_size]
+# up_train = up_data[test_size:400000]
 
-with open('up_train.json', 'w') as f:
-    json.dump(up_train, f, indent=2)
+# with open('up_train.json', 'w') as f:
+#     json.dump(up_train, f, indent=2)
 
-with open('up_test.json', 'w') as f:
-    json.dump(up_test, f, indent=2)
+# with open('up_test.json', 'w') as f:
+#     json.dump(up_test, f, indent=2)
 
-print(f"Saved {len(up_train)} training and {len(up_test)} test unit propagation traces")
+# print(f"Saved {len(up_train)} training and {len(up_test)} test unit propagation traces")
+
+# ######## RUN 3: MIXED TRACES (BOTH AC AND UP)
+# print("Creating mixed traces dataset...")
+# mixed_data = []
+
+# # Add all analyze conflict traces
+# for trace in all_traces:
+#     for ac_trace in trace["analyze_conflict_traces"]:
+#         trace_str = format_trace_as_string(ac_trace)
+#         mixed_data.append({"text": trace_str})
+
+# # Add all unit propagation traces
+# for trace in all_traces:
+#     for up_trace in trace["unit_prop_traces"]:
+#         trace_str = format_trace_as_string(up_trace)
+#         mixed_data.append({"text": trace_str})
+
+# # Shuffle and split into train/test with 1k test examples
+# random.shuffle(mixed_data)
+# test_size = 10240  # Use 1k or 20% if less data available
+# mixed_test = mixed_data[:test_size]
+# mixed_train = mixed_data[test_size:600000]
+
+# with open('mixed_train.json', 'w') as f:
+#     json.dump(mixed_train, f, indent=2)
+
+# with open('mixed_test.json', 'w') as f:
+#     json.dump(mixed_test, f, indent=2)
+
+# print(f"Saved {len(mixed_train)} training and {len(mixed_test)} test mixed traces")
+
 
 ######## RUN 3: MIXED TRACES (BOTH AC AND UP)
-print("Creating mixed traces dataset...")
-mixed_data = []
+# print("Creating solve traces dataset...")
+# solve_data = []
 
-# Add all analyze conflict traces
-for trace in all_traces:
-    for ac_trace in trace["analyze_conflict_traces"]:
-        trace_str = format_trace_as_string(ac_trace)
-        mixed_data.append({"text": trace_str})
+# for trace in all_traces:
+#     for ac_trace in trace["solve_traces"]:
+#         trace_str = format_trace_as_string(ac_trace)
+#         solve_data.append({"text": trace_str})
 
-# Add all unit propagation traces
-for trace in all_traces:
-    for up_trace in trace["unit_prop_traces"]:
-        trace_str = format_trace_as_string(up_trace)
-        mixed_data.append({"text": trace_str})
+# # Shuffle and split into train/test with 1k test examples
+# random.shuffle(solve_data)
+# test_size = 10240  # Use 1k or 20% if less data available
+# solve_test = solve_data[:test_size]
+# solve_train = solve_data[test_size:400000]
 
-# Shuffle and split into train/test with 1k test examples
-random.shuffle(mixed_data)
-test_size = 10240  # Use 1k or 20% if less data available
-mixed_test = mixed_data[:test_size]
-mixed_train = mixed_data[test_size:600000]
+# with open('solve_train.json', 'w') as f:
+#     json.dump(solve_train, f, indent=2)
 
-with open('mixed_train.json', 'w') as f:
-    json.dump(mixed_train, f, indent=2)
+# with open('solve_test.json', 'w') as f:
+#     json.dump(solve_test, f, indent=2)
 
-with open('mixed_test.json', 'w') as f:
-    json.dump(mixed_test, f, indent=2)
+# print(f"Saved {len(solve_train)} training and {len(solve_test)} test mixed traces")
 
-print(f"Saved {len(mixed_train)} training and {len(mixed_test)} test mixed traces")
-
-print("\nSummary:")
-print(f"- Analyze conflict: {len(ac_train)} train, {len(ac_test)} test")
-print(f"- Unit propagation: {len(up_train)} train, {len(up_test)} test") 
-print(f"- Mixed traces: {len(mixed_train)} train, {len(mixed_test)} test")
-print("\nFiles created:")
-print("- ac_train.json, ac_test.json")
-print("- up_train.json, up_test.json") 
-print("- mixed_train.json, mixed_test.json")
+# print("\nSummary:")
+# print(f"- Analyze conflict: {len(ac_train)} train, {len(ac_test)} test")
+# print(f"- Unit propagation: {len(up_train)} train, {len(up_test)} test") 
+# print(f"- Mixed traces: {len(mixed_train)} train, {len(mixed_test)} test")
+# print("\nFiles created:")
+# print("- ac_train.json, ac_test.json")
+# print("- up_train.json, up_test.json") 
+# print("- mixed_train.json, mixed_test.json")

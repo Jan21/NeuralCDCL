@@ -200,13 +200,12 @@ def main(cfg: DictConfig):
                 try:
                     split_index = output_ids.index(search_token_id)
                     end_index = output_ids.index(end_token_id)
-                    # print("Input PROMPT: ", input_prompt.shape, "\n ", "-"*10)
-                    # print("Output IDS: ", output_ids, "\n ", "-"*10)
                 except:
-                    # print(f"Unable to find {end_token_id} or {search_token_id}. Skipping example in {current_path}...")
-                    # print("Input PROMPT: ", input_prompt.shape, "\n ", "-"*10)
-                    # print("Output IDS: ", output_ids, "\n ", "-"*10)
+                    # Add placeholder to maintain alignment with ground truth
+                    predictions_text.append("")  # or None, or some placeholder
+                    predictions_ids.append([])   # or None, or some placeholder
                     continue
+                
                 # Extract everything after the search token
                 generated_ids = output_ids[split_index+1:end_index+1]
                 generated_text = tokenizer.decode(generated_ids, skip_special_tokens=False)
@@ -243,7 +242,7 @@ def main(cfg: DictConfig):
             print(f"  {metric}: {value:.4f}")
 
     # Save the complete results dictionary as pickle
-    with open(output_dir / "results.pkl", 'wb') as f:
+    with open(output_dir / "results_up.pkl", 'wb') as f:
         pickle.dump(results_dict, f)
 
     print(f"Complete results saved to {output_dir / 'results.pkl'}")    

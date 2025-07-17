@@ -169,9 +169,9 @@ def get_data(cfg: DictConfig, tokenizer):
     )
 
     # hf_dataset["test"] = hf_dataset["test"].select(range(int(128)))
-    hf_dataset["val"] = hf_dataset["val"].select(range(int(128)))
-    hf_dataset["test"] = hf_dataset["test"].select(range(int(128)))
-    hf_dataset["train"] = hf_dataset["train"].select(range(int(204080)))
+    hf_dataset["val"] = hf_dataset["val"].select(range(int(64)))
+    hf_dataset["test"] = hf_dataset["test"].select(range(int(64)))
+    # hf_dataset["train"] = hf_dataset["train"].select(range(int(16)))
 
     def tokenize(examples):
         texts = [

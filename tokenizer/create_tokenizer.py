@@ -38,7 +38,7 @@ def get_tokenizer(vocab, cfg):
 
 def get_vocab(cfg: DictConfig):
     # Get all JSON files from data directory and data/generalization directory
-    data_files = glob.glob("data/ac/*.json") + glob.glob("data/up/*.json") + glob.glob("data/mixed/*.json") + glob.glob("data/generalization/up/*.json") + glob.glob("data/generalization/ac/*.json") + glob.glob("data/generalization/mixed/*.json")
+    data_files = glob.glob("data/ac/*.json") + glob.glob("data/up/*.json") + glob.glob("data/mixed/*.json") + glob.glob("data/generalization/up/*.json") + glob.glob("data/generalization/ac/*.json") + glob.glob("data/generalization/mixed/*.json") + glob.glob("data/solve/*.json") + glob.glob("data/generalization/solve/*.json")
         
     all_data = []
     for file_path in data_files:

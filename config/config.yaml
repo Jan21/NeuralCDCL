@@ -13,35 +13,72 @@ data_preprocess:
   num_test: 256
   num_val: 2048
 
+# tok_data:
+#   train_file: "data/up/up_train.json"
+#   val_file: "data/up/up_test.json"
+#   test_file: "data/up/up_test.json"
+#   tokenizer_path: "tokenizer/tokenizer.json"
+
 tok_data:
-  train_file: "data/mixed/mixed_train.json"
-  val_file: "data/mixed/mixed_test.json"
-  test_file: "data/mixed/mixed_test.json"
+  train_file: "data/ac/ac_train.json"
+  val_file: "data/ac/ac_test.json"
+  test_file: "data/ac/ac_test.json"
   tokenizer_path: "tokenizer/tokenizer.json"
+
+# tok_data:
+#   train_file: "data/mixed/mixed_train.json"
+#   val_file: "data/mixed/mixed_test.json"
+#   test_file: "data/mixed/mixed_test.json"
+#   tokenizer_path: "tokenizer/tokenizer.json"
+
+# tok_data:
+#   train_file: "data/solve/solve_train_ex.json"
+#   val_file: "data/solve/solve_test.json"
+#   test_file: "data/solve/solve_test.json"
+#   tokenizer_path: "tokenizer/tokenizer.json"
+
+# data:
+#   datapath: data
+#   train_file: "up/up_train.json"
+#   val_file: "up/up_test.json"
+#   num_workers: 32
+#   split_str: "SPLIT_BEGIN"
 
 data:
   datapath: data
-  train_file: "mixed/mixed_train.json"
-  val_file: "mixed/mixed_test.json"
+  train_file: "ac/ac_train.json"
+  val_file: "ac/ac_test.json"
   num_workers: 32
   split_str: "SPLIT_BEGIN"
 
+# data:
+#   datapath: data
+#   train_file: "solve/solve_train.json"
+#   val_file: "solve/solve_test.json"
+#   num_workers: 32
+#   split_str: "SPLIT_BEGIN"
+
+
+# data:
+#   datapath: data
+#   train_file: "mixed/mixed_train.json"
+#   val_file: "mixed/mixed_test.json"
+#   num_workers: 32
+#   split_str: "SPLIT_BEGIN"
+
 model:
-  name: "Pythia-${model.n_layer}-${model.n_head}-${model.n_embd}-mix"
+  name: "Pythia-${model.n_layer}-${model.n_head}-${model.n_embd}-ac-debug-cos"
   batch_size: 128
   accumulate_grad_batches: 1
   block_size: 4096
-  epochs: 100
+  epochs: 20
   n_layer: 12
   n_head: 16
   n_embd: 256
-  vocab_size: 92
-  padded_vocab_size: 92
-  bos_id: 86
-  eos_id: 90
-
-optim:
-  lr: 1e-2
+  vocab_size: 136
+  padded_vocab_size: 136
+  bos_id: 131
+  eos_id: 135
 
 eval:
   num_examples: ${data_preprocess.num_test}
@@ -53,6 +90,24 @@ convert_hf:
   out_path: "temp/hf_${model.name}"
 
 inference:
-  modelpath: "./temp/hf_Pythia-12-16-256-mixed"
+  modelpath: "./temp/hf_Pythia-12-16-256-up"
   datapath: ${data.datapath}/generalization/
   batch_size: 256
+
+# optim:
+#   lr_type: linear-reg # options: linear or linear-reg, 
+#                     # otherwise cosine decay (lr_type: None)
+#   lr: 1e-4         # learning rate (used for cosine schedule)
+#   warmup_steps: 1000
+#   # n_steps: ${model.epochs}
+#   weight_decay: 0.01
+#   max_lr: 0.003
+
+optim:
+  lr_type: None # options: linear or linear-reg, 
+                    # otherwise cosine decay (lr_type: None)
+  lr: 0.0015         # learning rate (used for cosine schedule)
+  warmup_steps: 12180
+  # n_steps: ${model.epochs}
+  weight_decay: 0.01
+  max_lr: 0.002

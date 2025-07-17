@@ -101,7 +101,7 @@ class CDCLSolver:
                 trace.append(f"\nREAD_CONFLICT_CLAUSE READ_BEGIN {log_clause(conflict,self.clause2id[tuple(conflict)])} READ_END")
                 trace.append("SPLIT_BEGIN")
                 if self.level == 0:
-                    trace.extend(["UNSAT", "\nSOLVE_END"])
+                    trace.extend(["UNSAT", "END"])
                     self.ret_dic["solve_traces"].append(trace)
                     return False
                 trace.append(f"\nCALL_ANALYZE_CONFLICT")
@@ -149,6 +149,7 @@ class CDCLSolver:
                         f"\nWRITE_CONFLICT_CLAUSE WRITE_BEGIN c {' '.join(str(i))} WRITE_END",
                         f"\nUNIT_PROPAGATION_END",
                     ])
+                    trace.append("END")
                     self.ret_dic["unit_prop_traces"].append(trace)
                     propagated = False
                     return clause
@@ -352,10 +353,9 @@ def generate_random_formula(n_vars: int, clause_length: int = 3, variance: float
 
 ######## TEST
 formulas = []
-for i in tqdm(range(100)):
+for i in tqdm(range(100000)):
     num_vars = random.randint(5, 15)
     formulas.append(generate_random_formula(num_vars))
-
 # for i in tqdm(range(5000)):
 #     num_vars = 25
 #     formulas.append(generate_random_formula(num_vars))
@@ -451,7 +451,6 @@ for trace in traces:
     
     trace_strs.append(formatted_trace)
 
-# Now trace_strs[0] will have the desired structure
 print(json.dumps(trace_strs[0], indent=2))
 
 num_traces = len(trace_strs)
@@ -462,16 +461,12 @@ test_traces = trace_strs[split_idx:]
 
 print(f"Split {num_traces} traces into {len(train_traces)} training and {len(test_traces)} testing traces")
 
-# Save the splits to files
-
-
-# Save traces directly as JSON objects (no "text" wrapper needed)
 train_data = train_traces
 test_data = test_traces
 
-# # Save to JSON files
-# with open('train_CA.json', 'w') as f:
-#     json.dump(train_data, f, indent=2)
+# Save to JSON files
+with open('train_CA.json', 'w') as f:
+    json.dump(train_data, f, indent=2)
 
 with open('test_CA.json', 'w') as f:
     json.dump(test_data, f, indent=2)
